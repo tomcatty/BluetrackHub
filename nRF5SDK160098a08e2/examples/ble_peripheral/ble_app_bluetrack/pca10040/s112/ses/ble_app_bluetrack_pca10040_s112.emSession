@@ -11,18 +11,18 @@
  <Memory3/>
  <Memory4/>
  <Project>
-  <ProjectSessionItem path="ble_app_blinky_pca10040_s132"/>
-  <ProjectSessionItem path="ble_app_blinky_pca10040_s132;ble_app_blinky_pca10040_s132"/>
-  <ProjectSessionItem path="ble_app_blinky_pca10040_s132;ble_app_blinky_pca10040_s132;Application"/>
-  <ProjectSessionItem path="ble_app_blinky_pca10040_s132;ble_app_blinky_pca10040_s132;Board Definition"/>
-  <ProjectSessionItem path="ble_app_blinky_pca10040_s132;ble_app_blinky_pca10040_s132;None"/>
-  <ProjectSessionItem path="ble_app_blinky_pca10040_s132;ble_app_blinky_pca10040_s132;nRF_BLE"/>
-  <ProjectSessionItem path="ble_app_blinky_pca10040_s132;ble_app_blinky_pca10040_s132;nRF_BLE_Services"/>
-  <ProjectSessionItem path="ble_app_blinky_pca10040_s132;ble_app_blinky_pca10040_s132;nRF_Log"/>
-  <ProjectSessionItem path="ble_app_blinky_pca10040_s132;ble_app_blinky_pca10040_s132;nRF_Segger_RTT"/>
-  <ProjectSessionItem path="ble_app_blinky_pca10040_s132;ble_app_blinky_pca10040_s132;nRF_SoftDevice"/>
-  <ProjectSessionItem path="ble_app_blinky_pca10040_s132;ble_app_blinky_pca10040_s132;Segger Startup Files"/>
-  <ProjectSessionItem path="ble_app_blinky_pca10040_s132;ble_app_blinky_pca10040_s132;UTF8/UTF16 converter"/>
+  <ProjectSessionItem path="ble_app_bluetrack_pca10040_s112"/>
+  <ProjectSessionItem path="ble_app_bluetrack_pca10040_s112;ble_app_bluetrack_pca10040_s112"/>
+  <ProjectSessionItem path="ble_app_bluetrack_pca10040_s112;ble_app_bluetrack_pca10040_s112;Application"/>
+  <ProjectSessionItem path="ble_app_bluetrack_pca10040_s112;ble_app_bluetrack_pca10040_s112;Board Definition"/>
+  <ProjectSessionItem path="ble_app_bluetrack_pca10040_s112;ble_app_bluetrack_pca10040_s112;None"/>
+  <ProjectSessionItem path="ble_app_bluetrack_pca10040_s112;ble_app_bluetrack_pca10040_s112;nRF_BLE"/>
+  <ProjectSessionItem path="ble_app_bluetrack_pca10040_s112;ble_app_bluetrack_pca10040_s112;nRF_BLE_Services"/>
+  <ProjectSessionItem path="ble_app_bluetrack_pca10040_s112;ble_app_bluetrack_pca10040_s112;nRF_Log"/>
+  <ProjectSessionItem path="ble_app_bluetrack_pca10040_s112;ble_app_bluetrack_pca10040_s112;nRF_Segger_RTT"/>
+  <ProjectSessionItem path="ble_app_bluetrack_pca10040_s112;ble_app_bluetrack_pca10040_s112;nRF_SoftDevice"/>
+  <ProjectSessionItem path="ble_app_bluetrack_pca10040_s112;ble_app_bluetrack_pca10040_s112;Segger Startup Files"/>
+  <ProjectSessionItem path="ble_app_bluetrack_pca10040_s112;ble_app_bluetrack_pca10040_s112;UTF8/UTF16 converter"/>
  </Project>
  <Register1/>
  <Register2/>
