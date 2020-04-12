@@ -45,6 +45,18 @@
 #include <stdbool.h>
 #include "ble.h"
 #include "ble_srv_common.h"
+#include "nrf_sdh_ble.h"
+
+/**@brief   Macro for defining a ble_bluetrack instance.
+ *
+ * @param   _name   Name of the instance.
+ * @hideinitializer
+ */
+#define BLE_BLUETRACK_DEF(_name)                                                                          \
+static ble_bluetrack_t _name;                                                                             \
+NRF_SDH_BLE_OBSERVER(_name ## _obs,                                                                       \
+                     BLE_BLUETRACK_BLE_OBSERVER_PRIO,                                                     \
+                     ble_bluetrack_on_ble_evt, &_name)
 
 // Generated using nRFgo Studio
 #define BLUETRACK_UUID_BASE {0x21, 0xAE, 0x66, 0x08, 0x3B, 0x47, 0x26, 0xE6, 0x5D, 0x68, 0x68, 0xC7, 0x00, 0x00, 0x51, 0x30}
@@ -105,7 +117,6 @@ typedef struct ble_bluetrack_s
     ble_gatts_char_handles_t                               service_command_char_handles;           /**< Handles related to the Service Command Characteristic */
     ble_gatts_char_handles_t                               error_char_handles;                     /**< Handles related to the Error Characteristic */
     uint8_t                                                uuid_type;                              /**< BlueTrack Service UUID type. */
-    uint16_t                                               conn_handle;                            /**< Handle of the current connection (as provided by the BLE stack, is BLE_CONN_HANDLE_INVALID if not in a connection). */
     ble_bluetrack_address_write_handler_t                  address_write_handler;                  /**< If not NULL, handler to be called when Address Characteristic is written to. */
     ble_bluetrack_dcc_command_write_handler_t              dcc_command_write_handler;              /**< If not NULL, handler to be called when DCC Command Characteristic is written to. */
     ble_bluetrack_programming_track_select_write_handler_t programming_track_select_write_handler; /**< If not NULL, handler to be called when Programming Track Select Characteristic is written to. */
@@ -130,56 +141,61 @@ uint32_t ble_bluetrack_init(ble_bluetrack_t * p_bluetrack, const ble_bluetrack_i
  *
  * @details Handles all events from the BLE stack of interest to the BlueTrack Service.
  *
- * @param[in]   p_bluetrack  BlueTrack Service structure.
  * @param[in]   p_ble_evt    Event received from the BLE stack.
+ * @param[in]   p_context    BlueTrack Service structure.
  */
-void ble_bluetrack_on_ble_evt(ble_bluetrack_t * p_bluetrack, ble_evt_t * p_ble_evt);
+void ble_bluetrack_on_ble_evt(ble_evt_t const * p_ble_evt, void * p_context);
 
 
 /**@brief Function for updating the Response characteristic.
  *
  * @details The application calls this function after a service command is processed. The Response characteristic is sent to the client.
  *
+ * @param[in]   conn_handle     Handle of the peripheral connection to which the notification will be sent.
  * @param[in]   p_bluetrack     BlueTrack Service structure.
  * @param[in]   response_valid  Flag indicating whether the response is valid, i.e. did the DCC decoder respond as expected?
  * @param[in]   response_value  Value of response (to be interpreted contextually by the client).
  *
  * @return      NRF_SUCCESS on success, otherwise an error code.
  */
-uint32_t ble_bluetrack_response_update(ble_bluetrack_t * p_bluetrack, uint8_t response_valid, uint8_t response_value);
+uint32_t ble_bluetrack_response_update(uint16_t conn_handle, ble_bluetrack_t * p_bluetrack, uint8_t response_valid, uint8_t response_value);
 
 
 /**@brief Function for updating the Programming Track Select characteristic.
  *
  * @details The application calls this function after the Programming Track Select characteristic is written to. The client is notified of the change.
  *
+ * @param[in]   conn_handle     Handle of the peripheral connection to which the notification will be sent.
  * @param[in]   p_bluetrack     BlueTrack Service structure.
  *
  * @return      NRF_SUCCESS on success, otherwise an error code.
  */
-uint32_t ble_bluetrack_programming_track_select_update(ble_bluetrack_t * p_bluetrack);
+uint32_t ble_bluetrack_programming_track_select_update(uint16_t conn_handle, ble_bluetrack_t * p_bluetrack);
 
 
 /**@brief Function for updating the Stop characteristic.
  *
  * @details The application calls this function after the Stop characteristic is written to. The client is notified of the change.
  *
+ * @param[in]   conn_handle     Handle of the peripheral connection to which the notification will be sent.
  * @param[in]   p_bluetrack     BlueTrack Service structure.
  *
  * @return      NRF_SUCCESS on success, otherwise an error code.
  */
-uint32_t ble_bluetrack_stop_update(ble_bluetrack_t * p_bluetrack);
+uint32_t ble_bluetrack_stop_update(uint16_t conn_handle, ble_bluetrack_t * p_bluetrack);
 
 
 /**@brief Function for setting and updating the Error characteristic.
  *
  * @details The application calls this function to set and update the Error characteristic. The client is notified of the change.
  *
+ * @param[in]   conn_handle     Handle of the peripheral connection to which the notification will be sent.
  * @param[in]   p_bluetrack     BlueTrack Service structure.
+ * @param[in]   error_code      Error code the application wishes to communicate to the client.
  *
  * @return      NRF_SUCCESS on success, otherwise an error code.
  */
-uint32_t ble_bluetrack_error_update(ble_bluetrack_t * p_bluetrack, uint8_t error_code);
+uint32_t ble_bluetrack_error_update(uint16_t conn_handle, ble_bluetrack_t * p_bluetrack, uint8_t error_code);
 
 #endif // BLE_BLUETRACK_H__
 
