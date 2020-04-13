@@ -11,6 +11,7 @@
  */
 
 #include "sdk_common.h"
+#if NRF_MODULE_ENABLED(BLE_BLUETRACK)
 #include "ble_bluetrack.h"
 #include "ble_srv_common.h"
 
@@ -410,3 +411,4 @@ uint32_t ble_bluetrack_error_update(uint16_t conn_handle, ble_bluetrack_t * p_bl
 
     return sd_ble_gatts_hvx(conn_handle, &params);
 }
+#endif // NRF_MODULE_ENABLED(BLE_BLUETRACK)

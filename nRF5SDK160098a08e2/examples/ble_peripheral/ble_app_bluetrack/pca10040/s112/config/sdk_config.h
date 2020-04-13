@@ -287,6 +287,13 @@
 
 // </e>
 
+// <q> BLE_BLUETRACK_ENABLED  - ble_bluetrack - Bluetrack Service
+ 
+
+#ifndef BLE_BLUETRACK_ENABLED
+#define BLE_BLUETRACK_ENABLED 1
+#endif
+
 // <q> BLE_CSCS_ENABLED  - ble_cscs - Cycling Speed and Cadence Service
  
 
@@ -419,7 +426,7 @@
  
 
 #ifndef BLE_LBS_ENABLED
-#define BLE_LBS_ENABLED 1
+#define BLE_LBS_ENABLED 0
 #endif
 
 // <q> BLE_LLS_ENABLED  - ble_lls - Link Loss Service
@@ -11352,6 +11359,13 @@
 
 #ifndef BLE_BAS_C_BLE_OBSERVER_PRIO
 #define BLE_BAS_C_BLE_OBSERVER_PRIO 2
+#endif
+
+// <o> BLE_BLUETRACK_BLE_OBSERVER_PRIO  
+// <i> Priority with which BLE events are dispatched to the Bluetrack Service.
+
+#ifndef BLE_BLUETRACK_BLE_OBSERVER_PRIO
+#define BLE_BLUETRACK_BLE_OBSERVER_PRIO 2
 #endif
 
 // <o> BLE_BPS_BLE_OBSERVER_PRIO  
