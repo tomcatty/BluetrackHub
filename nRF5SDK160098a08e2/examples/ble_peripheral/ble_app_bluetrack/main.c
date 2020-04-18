@@ -2151,20 +2151,6 @@ static void services_init(void)
 }
 
 
-/**@brief Function for initializing security parameters.
- */
-//static void sec_params_init(void)
-//{
-//    m_sec_params.timeout      = SEC_PARAM_TIMEOUT;
-//    m_sec_params.bond         = SEC_PARAM_BOND;
-//    m_sec_params.mitm         = SEC_PARAM_MITM;
-//    m_sec_params.io_caps      = SEC_PARAM_IO_CAPABILITIES;
-//    m_sec_params.oob          = SEC_PARAM_OOB;
-//    m_sec_params.min_key_size = SEC_PARAM_MIN_KEY_SIZE;
-//    m_sec_params.max_key_size = SEC_PARAM_MAX_KEY_SIZE;
-//}
-
-
 /**@brief Function for handling the Connection Parameters Module.
  *
  * @details This function will be called for all events in the Connection Parameters Module which
@@ -2424,15 +2410,6 @@ static void idle_state_handle(void)
 }
 
 
-/**@brief Function for the Power manager.
- */
-//static void power_manage(void)
-//{
-//    uint32_t err_code = sd_app_evt_wait();
-//    APP_ERROR_CHECK(err_code);
-//}
-
-
 /**@brief Function for application main entry.
  */
 int main(void)
@@ -2450,7 +2427,6 @@ int main(void)
     services_init();
     advertising_init();
     conn_params_init();
-//    sec_params_init();
 //    ppi_init();
 //    lpcomp_init();
 //    adc_init();
