@@ -55,6 +55,8 @@
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 
+#include "gatts_cache_manager.h"
+
 #define DREKKER_DEVELOPMENT_COMPANY_IDENTIFIER 0x0343                               /**< Assigned by Bluetooth SIG. */
 
 //#define NRF_UICR_FIRMWARE_VERSION_ADDR  (NRF_UICR_BASE + 0x80)                      /**< CUSTOMER[0] in UICR register stores the application version. */
@@ -175,8 +177,8 @@
 
 #define DEAD_BEEF                       0xDEADBEEF                                  /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
-//#define SCHED_MAX_EVENT_DATA_SIZE       sizeof(app_timer_event_t)                   /**< Maximum size of scheduler events. Timer is our largest scheduled event (8 bytes). Note that scheduler BLE stack events do not contain any data, as the events are being pulled from the stack in the event handler. */
-//#define SCHED_QUEUE_SIZE                10                                          /**< Maximum number of events in the scheduler queue. This is a best guess. */
+#define SCHED_MAX_EVENT_DATA_SIZE       sizeof(app_timer_event_t)                   /**< Maximum size of scheduler events. Timer is our largest scheduled event (8 bytes). Note that scheduler BLE stack events do not contain any data, as the events are being pulled from the stack in the event handler. */
+#define SCHED_QUEUE_SIZE                10                                          /**< Maximum number of events in the scheduler queue. This is a best guess. */
 
 /**@brief Structure of a DCC command. */
 //typedef struct
@@ -1903,10 +1905,10 @@ static void timers_init(void)
 
 /**@brief Function for the Event Scheduler initialization.
  */
-//static void scheduler_init(void)
-//{
-//    APP_SCHED_INIT(SCHED_MAX_EVENT_DATA_SIZE, SCHED_QUEUE_SIZE);
-//}
+static void scheduler_init(void)
+{
+    APP_SCHED_INIT(SCHED_MAX_EVENT_DATA_SIZE, SCHED_QUEUE_SIZE);
+}
 
 
 /**@brief Function for initializing BlueTrack data structures.
@@ -2023,25 +2025,6 @@ static void gap_params_init(void)
     gap_conn_params.conn_sup_timeout  = CONN_SUP_TIMEOUT;
 
     err_code = sd_ble_gap_ppcp_set(&gap_conn_params);
-    APP_ERROR_CHECK(err_code);
-
-    // Randomise address to ensure iOS detects device correctly after coming out of DFU
-    // First read the address
-    err_code = sd_ble_gap_addr_get(&address);
-    APP_ERROR_CHECK(err_code);
-
-    NRF_LOG_INFO("address.addr_id_peer is 0x%x.", address.addr_id_peer);
-    NRF_LOG_INFO("address.addr_type is 0x%x.", address.addr_type);
-    NRF_LOG_INFO("address.addr[0] is 0x%x.", address.addr[0]);
-    NRF_LOG_INFO("address.addr[1] is 0x%x.", address.addr[1]);
-    NRF_LOG_INFO("address.addr[2] is 0x%x.", address.addr[2]);
-    NRF_LOG_INFO("address.addr[3] is 0x%x.", address.addr[3]);
-    NRF_LOG_INFO("address.addr[4] is 0x%x.", address.addr[4]);
-    NRF_LOG_INFO("address.addr[5] is 0x%x.", address.addr[5]);
-
-    //address.addr_type = BLE_GAP_ADDR_TYPE_RANDOM_PRIVATE_NON_RESOLVABLE;
-    address.addr[1] = 0x00;
-    err_code = sd_ble_gap_addr_set(&address);
     APP_ERROR_CHECK(err_code);
 }
 
@@ -2256,6 +2239,8 @@ static void advertising_start(void)
 static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 {
     ret_code_t                       err_code;
+    ble_gatts_evt_write_t const * p_evt_write;
+    uint8_t const * data;
 //    static ble_gap_evt_auth_status_t m_auth_status;
 //    ble_gap_enc_info_t *             p_enc_info;
 //    uint16_t                         m_programming_track_select_len = PROGRAMMING_TRACK_SELECT_CHAR_SIZE;
@@ -2359,6 +2344,19 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
             APP_ERROR_CHECK(err_code);
             break;
 
+        case BLE_GATTS_EVT_WRITE:
+
+            p_evt_write = &p_ble_evt->evt.gatts_evt.params.write;
+            data = p_evt_write->data;
+            // Empirically, Service Changed CCCD has handle 0xD, and is always Indicated (value is 0x2)
+            // Note data is little endian
+            if((p_evt_write->handle == 0xD) && (p_evt_write->len == 2) && (data[0] == 0x2)) {
+                NRF_LOG_INFO("Service Changed ready to Indicate");
+                err_code = gscm_service_changed_ind_send(m_conn_handle);
+                APP_ERROR_CHECK(err_code);
+            }
+            break;
+
         default:
             // No implementation needed.
             break;
@@ -2446,7 +2444,7 @@ int main(void)
     log_init();
     power_management_init();
     ble_stack_init();
-//    scheduler_init();
+    scheduler_init();
     gap_params_init();
     gatt_init();
     services_init();
@@ -2466,6 +2464,7 @@ int main(void)
     // Enter main loop
     for (;;)
     {
+        app_sched_execute();
         idle_state_handle();
     }
 }

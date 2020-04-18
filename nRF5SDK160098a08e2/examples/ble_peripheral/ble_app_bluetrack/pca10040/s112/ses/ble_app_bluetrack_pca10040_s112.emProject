@@ -102,6 +102,7 @@
       <file file_name="../../../../../../components/ble/common/ble_srv_common.c" />
       <file file_name="../../../../../../components/ble/nrf_ble_gatt/nrf_ble_gatt.c" />
       <file file_name="../../../../../../components/ble/nrf_ble_qwr/nrf_ble_qwr.c" />
+      <file file_name="../../../../../../components/ble/peer_manager/gatts_cache_manager.c" />
     </folder>
     <folder Name="UTF8/UTF16 converter">
       <file file_name="../../../../../../external/utf_converter/utf.c" />
