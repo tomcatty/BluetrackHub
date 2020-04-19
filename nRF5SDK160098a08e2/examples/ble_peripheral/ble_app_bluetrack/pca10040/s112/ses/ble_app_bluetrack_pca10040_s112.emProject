@@ -109,6 +109,7 @@
     </folder>
     <folder Name="nRF_BLE_Services">
       <file file_name="../../../../../../components/ble/ble_services/ble_bluetrack/ble_bluetrack.c" />
+      <file file_name="../../../../../../components/ble/ble_services/ble_dis/ble_dis.c" />
     </folder>
     <folder Name="nRF_SoftDevice">
       <file file_name="../../../../../../components/softdevice/common/nrf_sdh.c" />

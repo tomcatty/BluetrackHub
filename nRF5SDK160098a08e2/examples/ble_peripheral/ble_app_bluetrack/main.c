@@ -45,6 +45,7 @@
 //#include "ble_debug_assert_handler.h"
 //#include "pstorage.h"
 #include "ble_bluetrack.h"
+#include "ble_dis.h"
 //#include "app_util_platform.h"
 //#include "app_uart.h"
 #include "nrf_ble_gatt.h"
@@ -57,9 +58,7 @@
 
 #include "gatts_cache_manager.h"
 
-#define DREKKER_DEVELOPMENT_COMPANY_IDENTIFIER 0x0343                               /**< Assigned by Bluetooth SIG. */
-
-//#define NRF_UICR_FIRMWARE_VERSION_ADDR  (NRF_UICR_BASE + 0x80)                      /**< CUSTOMER[0] in UICR register stores the application version. */
+#define DREKKER_DEVELOPMENT_COMPANY_IDENTIFIER 0x0343                               /**< Assigned by Bluetooth SIG. */            
 
 //#define DCC_COMMAND_PROG_PIN_NO         0                                           /**< Set DCC Command Pin Number when Programming Track selected to output P0.0 */
 //#define LPCOMP_ADC_INPUT_PIN_NO         1                                           /**< Note LPCOMP/ADC Input Pin Number is output P0.1 */
@@ -146,22 +145,25 @@
 //#define PROGRAMMING                     1                                           /**< Indicates DCC commands are sent to the programming track. */
 //#define MAIN_REPEAT                     2                                           /**< Indicates repeating DCC commands are being sent to the main track in programming mode */
 
-#define DEVICE_NAME                     "BlueTrack"                                 /**< Name of device. Will be included in the advertising data. Limit length to 11 to allow Master Emulator to connect (unexplained). */
+#define DEVICE_NAME                     "BlueTrack"                                /**< Name of device. Will be included in the advertising data. Limit length to 11 to allow Master Emulator to connect (unexplained). */
 
-#define APP_BLE_OBSERVER_PRIO           3                                       /**< Application's BLE observer priority. You shouldn't need to modify this value. */
-#define APP_BLE_CONN_CFG_TAG            1                                       /**< A tag identifying the SoftDevice BLE configuration. */
+#define MODEL_NUMBER                    "BlueTrack Hub"                            /**< Model number for DIS. **/
+#define MANUFACTURER_NAME               "Drekker Development Pty. Ltd."            /**< Manufacturer name for DIS. **/
 
-#define APP_ADV_INTERVAL                64                                          /**< The advertising interval (in units of 0.625 ms. This value corresponds to 40 ms). */
-#define APP_ADV_DURATION                BLE_GAP_ADV_TIMEOUT_GENERAL_UNLIMITED       /**< Advertising duration in 10 ms units. */
+#define APP_BLE_OBSERVER_PRIO           3                                          /**< Application's BLE observer priority. You shouldn't need to modify this value. */
+#define APP_BLE_CONN_CFG_TAG            1                                          /**< A tag identifying the SoftDevice BLE configuration. */
+
+#define APP_ADV_INTERVAL                MSEC_TO_UNITS(20, UNIT_0_625_MS )          /**< The advertising interval, 20ms recommended by R12 of Accessory Design Guidelines for Apple Devices */
+#define APP_ADV_DURATION                BLE_GAP_ADV_TIMEOUT_GENERAL_UNLIMITED      /**< Advertising duration in 10 ms units. */
 
 //#define APP_TIMER_PRESCALER             0                                           /**< Value of the RTC1 PRESCALER register (no prescaling, maximum resolution). */
 //#define APP_TIMER_MAX_TIMERS            3                                           /**< Maximum number of simultaneously created timers (only output timer and feedback timer). */
 //#define APP_TIMER_OP_QUEUE_SIZE         4                                           /**< Size of timer operation queues (only output timer and feedback timer, + 1 for how the queue is implemented). */
 
-#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(500, UNIT_1_25_MS)            /**< Minimum acceptable connection interval (0.5 seconds). */
+#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(510, UNIT_1_25_MS)            /**< Minimum acceptable connection interval (0.51 seconds to comply with R12 of Accessory Design Guidelines for Apple Devices). */
 #define MAX_CONN_INTERVAL               MSEC_TO_UNITS(1000, UNIT_1_25_MS)           /**< Maximum acceptable connection interval (1 second). */
-#define SLAVE_LATENCY                   0                                           /**< Slave latency. */
-#define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(4000, UNIT_10_MS)             /**< Connection supervisory timeout (4 seconds). */
+#define SLAVE_LATENCY                   0                                           /**< Slave latency (0 to comply with R12 of Accessory Design Guidelines for Apple Devices). */
+#define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(4000, UNIT_10_MS)             /**< Connection supervisory timeout (4 seconds to comply with R12 of Accessory Design Guidelines for Apple Devices). */
 
 #define FIRST_CONN_PARAMS_UPDATE_DELAY  APP_TIMER_TICKS(20000)                      /**< Time from initiating event (connect or start of notification) to first time sd_ble_gap_conn_param_update is called (5 seconds). */
 #define NEXT_CONN_PARAMS_UPDATE_DELAY   APP_TIMER_TICKS(5000)                       /**< Time between each call to sd_ble_gap_conn_param_update after the first call (30 seconds). */
@@ -2013,10 +2015,6 @@ static void gap_params_init(void)
                                           strlen(DEVICE_NAME));
     APP_ERROR_CHECK(err_code);
 
-    // Set appearance value to generic computer
-    err_code = sd_ble_gap_appearance_set(BLE_APPEARANCE_GENERIC_COMPUTER);
-    APP_ERROR_CHECK(err_code);
-
     memset(&gap_conn_params, 0, sizeof(gap_conn_params));
 
     gap_conn_params.min_conn_interval = MIN_CONN_INTERVAL;
@@ -2055,14 +2053,16 @@ static void advertising_init(void)
     uint32_t                 firmware_version;
     ble_uuid_t adv_uuids[] = {{BLUETRACK_UUID_SERVICE, m_bluetrack.uuid_type}};
 
-    // Retrieve firmware version from UICR
-    //memcpy(&firmware_version, (void *)NRF_UICR_FIRMWARE_VERSION_ADDR, sizeof(firmware_version));
+    // Retrieve firmware version from UICR, CUSTOMER[0] stores the application version. */
+    firmware_version = NRF_UICR->CUSTOMER[0];
     
     // Construct manufacturing data
     manuf_data.company_identifier = DREKKER_DEVELOPMENT_COMPANY_IDENTIFIER;
 
-    //deviceID[0] = NRF_FICR->DEVICEID[0];
-    //deviceID[1] = NRF_FICR->DEVICEID[1];
+    deviceID[0] = NRF_FICR->DEVICEID[0];
+    deviceID[1] = NRF_FICR->DEVICEID[1];
+
+    NRF_LOG_INFO("deviceID[0] = 0x%x, deviceID[1] = 0x%x", deviceID[0], deviceID[1]);
 
     // Make everything little endian
     identifier[0] = firmware_version & 0xFF;
@@ -2131,7 +2131,10 @@ static void services_init(void)
 {
     ret_code_t           err_code;
     ble_bluetrack_init_t init;
+    ble_dis_init_t       dis_init;
     nrf_ble_qwr_init_t   qwr_init = {0};
+    ble_srv_utf8_str_t   manufact_name_str = {.length = strlen(MANUFACTURER_NAME),.p_str  = (uint8_t *)MANUFACTURER_NAME};
+    ble_srv_utf8_str_t   model_num_str = {.length = strlen(MODEL_NUMBER),.p_str  = (uint8_t *)MODEL_NUMBER}; 
 
     // Initialise Queued Write Module.
     qwr_init.error_handler = nrf_qwr_error_handler;
@@ -2147,6 +2150,14 @@ static void services_init(void)
     init.service_command_write_handler = service_command_write_handler;
 
     err_code = ble_bluetrack_init(&m_bluetrack, &init);
+    APP_ERROR_CHECK(err_code);
+
+    // Initialise DIS data
+    memset(&dis_init, 0, sizeof(dis_init));
+    dis_init.manufact_name_str = manufact_name_str;
+    dis_init.model_num_str = model_num_str;
+    dis_init.dis_char_rd_sec = SEC_OPEN;
+    err_code = ble_dis_init(&dis_init);
     APP_ERROR_CHECK(err_code);
 }
 
