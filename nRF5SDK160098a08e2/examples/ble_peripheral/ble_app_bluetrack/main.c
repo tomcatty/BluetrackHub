@@ -1805,7 +1805,7 @@ static void timers_init(void)
 //    err_code = app_timer_create(&feedback_timer, APP_TIMER_MODE_SINGLE_SHOT, feedback_timer_timeout_handler);
 //    APP_ERROR_CHECK(err_code);
 
-    // Initialize timer module, making it use the scheduler
+    // Initialize timer module
     ret_code_t err_code = app_timer_init();
     APP_ERROR_CHECK(err_code);
 }
