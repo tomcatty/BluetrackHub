@@ -51,6 +51,9 @@
 #include "nrf_ble_gatt.h"
 #include "nrf_ble_qwr.h"
 #include "nrf_pwr_mgmt.h"
+#include "nrf_drv_gpiote.h"
+#include "nrf_drv_timer.h"
+#include "nrf_drv_ppi.h"
 
 #include "nrf_log.h"
 #include "nrf_log_ctrl.h"
@@ -60,24 +63,38 @@
 
 #define DREKKER_DEVELOPMENT_COMPANY_IDENTIFIER 0x0343                               /**< Assigned by Bluetooth SIG. */            
 
-//#define DCC_COMMAND_PROG_PIN_NO         0                                           /**< Set DCC Command Pin Number when Programming Track selected to output P0.0 */
-//#define LPCOMP_ADC_INPUT_PIN_NO         1                                           /**< Note LPCOMP/ADC Input Pin Number is output P0.1 */
-//#define BRAKE_PIN_NO                    2                                           /**< Set Brake Pin Number to output P0.2 */
-//#define THERMAL_PIN_NO                  3                                           /**< Set Thermal Pin Number to output P0.3 */
-//#define OVERLOAD_LED_PIN_NO             4                                           /**< Set Overload LED Pin Number to output P0.4 */
-//#define BLE_LED_PIN_NO                  5                                           /**< Set BLE LED Pin Number to output P0.5; flashes while advertising, solid when connected */
-//#define PROGRAMMING_LED_PIN_NO          6                                           /**< Set Programming LED PIN Number to output P0.6 */
-//#define DCC_COMMAND_PIN_NO              7                                           /**< Set DCC Command Pin Number to output P0.7 */
-//#define UART_RTS                        8                                           /**< Debug UART RTS pin. Corresponds to Segger UART interface. */
-//#define UART_TX                         9                                           /**< Debug UART TX pin. Corresponds to Segger UART interface. */
-//#define UART_CTS                        10                                          /**< Debug UART CTS pin. Corresponds to Segger UART interface. */
-//#define UART_RX                         11                                          /**< Debug UART RX pin. Corresponds to Segger UART interface. */
-//#define OUTPUT_OFFSET                   12                                          /**< Start relay address at output P0.12; relay outputs go to P0.25 */
-//#define N_OUTPUTS                       14                                          /**< Number of relay outputs */
-                                                                                    /**< P0.26 and P0.27 are used by the LFCLK */
-//#define SYNC_PIN_NO                     28                                          /**< Set Sync Pin Number to output P0.28 (this is shared with the DFU button) */
-//#define STOP_LED_PIN_NO                 29                                          /**< Set Stop LED Pin Number to output P0.29 */
+#define MAIN_DCC_PIN_NO                 2
+#define MAIN_I_SENSE_PIN_NO             3
+#define BRAKE_N_PIN_NO                  4
+#define RELAY_1_PIN_NO                  9
+#define RELAY_2_PIN_NO                  10
+#define RELAY_3_PIN_NO                  11
+#define RELAY_4_PIN_NO                  12
+#define RELAY_5_PIN_NO                  13
+#define RELAY_6_PIN_NO                  14
+#define RELAY_7_PIN_NO                  15
+#define RELAY_8_PIN_NO                  16
+#define RELAY_9_PIN_NO                  17
+#define RELAY_10_PIN_NO                 18
+#define RELAY_11_PIN_NO                 19
+#define RELAY_12_PIN_NO                 20
+#define RELAY_13_PIN_NO                 22
+#define RELAY_14_PIN_NO                 23
+#define SYNC_PIN_NO                     24
+#define STOP_LED_PIN_NO                 25
+#define PROG_I_SENSE_PIN                26
+#define PROG_DCC_PIN_NO                 27                            
+#define THERMAL_N_PIN_NO                28
+#define OVER_LED_PIN_NO                 29
+#define BLE_LED_PIN_NO                  30
+#define PROG_LED_PIN_NO                 31
 
+#define N_OUTPUTS                       14                                          /**< 14 Relay Outputs in total */
+
+#define DCC_ONE_TIME_US                 58                                          /**< 58us (see S-9.1) */
+#define DCC_ZERO_TIME_US                100                                         /**< 100us (see S-9.1) */
+
+#define BLE_LED_TOGGLE_TIME_MS          500                                         /**< Advertising LED toggles every 500ms */
 //#define ADC_DELTA                       20                                          /**< ADC value above the baseline required to trigger an acknowledge */
                                                                                     /* 10 bit ADC, 1.2V bandgap reference, and 1.74kohm sense resistor gives the following resolutions:
                                                                                      300uA/A (min) sensitivity - 1.497mA
@@ -235,13 +252,36 @@ static ble_gap_adv_data_t m_adv_data =
     }
 };
 
+const nrf_drv_timer_t TIMER_DCC_DATA =           NRF_DRV_TIMER_INSTANCE(1);
+const nrf_drv_timer_t TIMER_BLE_LED =            NRF_DRV_TIMER_INSTANCE(2);
+const nrf_drv_timer_t TIMER_DCC_CONTINOUS_ONES = NRF_DRV_TIMER_INSTANCE(3);
+
+static nrf_ppi_channel_t ble_led_timer_to_ble_led;
+static nrf_ppi_channel_t dcc_data_to_main_dcc;
+static nrf_ppi_channel_t dcc_data_to_prog_dcc;
+static nrf_ppi_channel_t dcc_continuous_ones_to_main_dcc;
+static nrf_ppi_channel_t dcc_continuous_ones_to_prog_dcc;
+
 // Persistent storage system event handler
 //void pstorage_sys_event_handler (uint32_t p_evt);
 
 //static ble_bluetrack_t                  m_bluetrack;                                          /**< BlueTrack service structure instance */
 //static app_timer_id_t                   output_timer;                                         /**< App Timer instance for relay output timing */
 //static app_timer_id_t                   feedback_timer;                                       /**< App Timer instance for feedback ADC measurement timing */
-//static uint32_t                         output_index[N_OUTPUTS];                              /**< Pin Number storage for the relay outputs */
+static nrf_drv_gpiote_pin_t             output_index[N_OUTPUTS] = {RELAY_1_PIN_NO,            /**< Pin Number storage for the relay outputs */
+                                                                   RELAY_2_PIN_NO,
+                                                                   RELAY_3_PIN_NO,
+                                                                   RELAY_4_PIN_NO,
+                                                                   RELAY_5_PIN_NO,
+                                                                   RELAY_6_PIN_NO,
+                                                                   RELAY_7_PIN_NO,
+                                                                   RELAY_8_PIN_NO,
+                                                                   RELAY_9_PIN_NO,
+                                                                   RELAY_10_PIN_NO,
+                                                                   RELAY_11_PIN_NO,
+                                                                   RELAY_12_PIN_NO,
+                                                                   RELAY_13_PIN_NO,
+                                                                   RELAY_14_PIN_NO};
 //static bool                             output_flags[N_OUTPUTS];                              /**< Flags for requesting relay activation */
 //static dcc_command_t                    dcc_command_buffer[DCC_COMMAND_BUFFER_SIZE];          /**< DCC command buffer that stores pending commands */
 //static uint8_t                          producer_index;                                       /**< Index of the next available DCC command buffer slot that can be filled */
@@ -1189,18 +1229,16 @@ static void service_command_write_handler(ble_bluetrack_t * p_bluetrack, uint8_t
 //}
 
 
-/**@brief Function for handling the GPIOTE interrupt.
+/**@brief Function for handling the THERMAL_N signal going high to low.
  *
- * @details The GPIOTE interrupt handler will only be called on thermal pin going LOW, indicating overtemperature, therefore disable DCC.
+ * @details This indicates overtemperature, therefore disable DCC.
  */
-//void GPIOTE_IRQHandler(void)
-//{
-//    // Clear event
-//    NRF_GPIOTE->EVENTS_IN[0] = 0;
-//
-//    // Disable DCC
-//    disable_DCC(ERROR_CODE_OVERTEMPERATURE);
-//}
+void thermal_n_hi_to_lo_handler(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t action)
+{
+    NRF_LOG_INFO("THERMAL_N signal went high to low");
+    // Disable DCC
+    //disable_DCC(ERROR_CODE_OVERTEMPERATURE);
+}
 
 
 /**@brief Function for handling the LPCOMP interrupt.
@@ -1252,13 +1290,23 @@ static void service_command_write_handler(ble_bluetrack_t * p_bluetrack, uint8_t
 //}
 
 
-/**@brief Function for handling the TIMER1 interrupt.
+/**@brief Dummy function for handling timer events.
  *
- * @details This interrupt drives the DCC output logic. Based on the phase flags, and the state of the buffer, appropriate values are loaded into TIMER1 CC[0]
+ * @details This handler does nothing.
+ */
+void dummy_timer_event_handler(nrf_timer_event_t event_type, void* p_context)
+{
+      NRF_LOG_INFO("Dummy timer event triggered");
+}
+
+
+/**@brief Function for handling the DCC_DATA timer event.
+ *
+ * @details This handler drives the DCC output logic. Based on the phase flags, and the state of the buffer, appropriate values are loaded into TIMER1 CC[0]
  * register correponding to durations of DCC 1s and 0s. A sync output is triggered at the start of each packet. If required, feedback is collected.
  */
-//void TIMER1_IRQHandler(void)
-//{
+void timer_dcc_data_event_handler(nrf_timer_event_t event_type, void* p_context)
+{
 //    uint32_t err_code;
 //    dcc_command_t *active_packet = NULL;
 //    bool dcc_packet = false;
@@ -1532,7 +1580,7 @@ static void service_command_write_handler(ble_bluetrack_t * p_bluetrack, uint8_t
 //    {
 //        APP_ERROR_CHECK(NRF_ERROR_INVALID_FLAGS);
 //    }
-//}
+}
 
 
 /**@brief Function for handling the feedback application timer expiry.
@@ -1674,100 +1722,76 @@ static void service_command_write_handler(ble_bluetrack_t * p_bluetrack, uint8_t
 //}
 
 
-/**@brief Function for initializing the GIO module.
- */
-//static void gio_init(void)
-//{
-//    uint32_t i;
-//
-//    // Initialise overload LED
-//    nrf_gpio_cfg_output(OVERLOAD_LED_PIN_NO);
-//    nrf_gpio_pin_clear(OVERLOAD_LED_PIN_NO);
-//
-//    // Initialise programming LED
-//    nrf_gpio_cfg_output(PROGRAMMING_LED_PIN_NO);
-//    nrf_gpio_pin_clear(PROGRAMMING_LED_PIN_NO);
-//
-//    // Initialise stop LED (we start off stopped)
-//    nrf_gpio_cfg_output(STOP_LED_PIN_NO);
-//    nrf_gpio_pin_set(STOP_LED_PIN_NO);
-//
-//    // Initialise sync output
-//    nrf_gpio_cfg_output(SYNC_PIN_NO);
-//    nrf_gpio_pin_clear(SYNC_PIN_NO);
-//
-//    // Initialise brake output (LOW is engaged, we start off engaged)
-//    nrf_gpio_cfg_output(BRAKE_PIN_NO);
-//    nrf_gpio_pin_clear(BRAKE_PIN_NO);
-//
-//    // Initialise relay outputs
-//    for (i =0; i < (N_OUTPUTS); i++)
-//    {
-//        nrf_gpio_cfg_output(i+OUTPUT_OFFSET);
-//        nrf_gpio_pin_clear(i+OUTPUT_OFFSET);
-//    }
-//}
-
-
 /**@brief Function for initialising the GPIOTE module.
  */
-//static void gpiote_init(void)
-//{
-//    // Initialise DCC output - under GPIOTE control
-//    nrf_gpio_cfg_output(DCC_COMMAND_PIN_NO);
-//    
-//    // Initialise programming DCC output - under GPIOTE control
-//    nrf_gpio_cfg_output(DCC_COMMAND_PROG_PIN_NO);
-//
-//    // Initialise BLE LED - under GPIOTE control initially
-//    nrf_gpio_cfg_output(BLE_LED_PIN_NO);
-//
-//    // Initialise thermal input - under GPIOTE control
-//    nrf_gpio_cfg_sense_input(THERMAL_PIN_NO, NRF_GPIO_PIN_PULLUP, NRF_GPIO_PIN_SENSE_HIGH);
-//
-//    // Thermal input on IN[0]
-//    NRF_GPIOTE->CONFIG[0] = (
-//                            (GPIOTE_CONFIG_POLARITY_HiToLo << GPIOTE_CONFIG_POLARITY_Pos) |
-//                            (THERMAL_PIN_NO << GPIOTE_CONFIG_PSEL_Pos) |
-//                            (GPIOTE_CONFIG_MODE_Event << GPIOTE_CONFIG_MODE_Pos)
-//                            );
-//
-//    // Advertising output on OUT[1]
-//    NRF_GPIOTE->CONFIG[1] = (
-//                            (GPIOTE_CONFIG_OUTINIT_Low << GPIOTE_CONFIG_OUTINIT_Pos) |
-//                            (GPIOTE_CONFIG_POLARITY_Toggle << GPIOTE_CONFIG_POLARITY_Pos) |
-//                            (BLE_LED_PIN_NO << GPIOTE_CONFIG_PSEL_Pos) |
-//                            (GPIOTE_CONFIG_MODE_Task << GPIOTE_CONFIG_MODE_Pos)
-//                            );
-//
-//    // DCC output on OUT[2] (initially)
-//    NRF_GPIOTE->CONFIG[2] = (
-//                            (GPIOTE_CONFIG_OUTINIT_Low << GPIOTE_CONFIG_OUTINIT_Pos) |
-//                            (GPIOTE_CONFIG_POLARITY_Toggle << GPIOTE_CONFIG_POLARITY_Pos) |
-//                            (DCC_COMMAND_PIN_NO << GPIOTE_CONFIG_PSEL_Pos) |
-//                            (GPIOTE_CONFIG_MODE_Task << GPIOTE_CONFIG_MODE_Pos)
-//                            );
-//    
-//    // DCC programming output on OUT[3] (initially)
-//    NRF_GPIOTE->CONFIG[3] = (
-//                             (GPIOTE_CONFIG_OUTINIT_Low << GPIOTE_CONFIG_OUTINIT_Pos) |
-//                             (GPIOTE_CONFIG_POLARITY_Toggle << GPIOTE_CONFIG_POLARITY_Pos) |
-//                             (DCC_COMMAND_PROG_PIN_NO << GPIOTE_CONFIG_PSEL_Pos) |
-//                             (GPIOTE_CONFIG_MODE_Task << GPIOTE_CONFIG_MODE_Pos)
-//                             );
-//
-//    // Configure IN[0] interrupt
-//    NRF_GPIOTE->INTENSET = GPIOTE_INTENSET_IN0_Msk;
-//    NVIC_ClearPendingIRQ(GPIOTE_IRQn);
-//    NVIC_SetPriority(GPIOTE_IRQn, GPIOTE_IRQ_PRI);
-//    NVIC_EnableIRQ(GPIOTE_IRQn);
-//
-//    // Check if IN[0] was already low, if so, disable DCC
-//    if (!nrf_gpio_pin_read(THERMAL_PIN_NO))
-//    {
-//        disable_DCC(ERROR_CODE_OVERTEMPERATURE);
-//    }
-//}
+static void gpiote_init(void)
+{
+    ret_code_t                  err_code;
+    uint32_t                    i;
+    nrf_drv_gpiote_in_config_t  config_in =               GPIOTE_CONFIG_IN_SENSE_HITOLO(false);
+    nrf_drv_gpiote_out_config_t config_out_toggle_false = GPIOTE_CONFIG_OUT_TASK_TOGGLE(false);   
+    nrf_drv_gpiote_out_config_t config_out_simple_false = GPIOTE_CONFIG_OUT_SIMPLE(false);
+    nrf_drv_gpiote_out_config_t config_out_simple_true =  GPIOTE_CONFIG_OUT_SIMPLE(true);
+
+    err_code = nrf_drv_gpiote_init();
+    APP_ERROR_CHECK(err_code);
+
+    // Initialise main DCC output - under PPI control
+    err_code = nrf_drv_gpiote_out_init(MAIN_DCC_PIN_NO, &config_out_toggle_false);
+    APP_ERROR_CHECK(err_code);
+    nrf_drv_gpiote_out_task_enable(MAIN_DCC_PIN_NO);
+
+    // Initialise brake output (start with brake on) - under CPU control
+    err_code = nrf_drv_gpiote_out_init(BRAKE_N_PIN_NO, &config_out_simple_false);
+    APP_ERROR_CHECK(err_code);
+
+    // Initialise relay outputs (start not actuated) - under CPU control
+    for (i =0; i < (N_OUTPUTS); i++)
+    {
+        err_code = nrf_drv_gpiote_out_init(output_index[i], &config_out_simple_false);
+        APP_ERROR_CHECK(err_code);
+    }
+
+    // Initialise sync output (start with no SYNC indicated) - under CPU control
+    err_code = nrf_drv_gpiote_out_init(SYNC_PIN_NO, &config_out_simple_false);
+    APP_ERROR_CHECK(err_code);     
+
+    // Initialise stop LED (start stopped) - under CPU control
+    err_code = nrf_drv_gpiote_out_init(STOP_LED_PIN_NO, &config_out_simple_true);
+    APP_ERROR_CHECK(err_code);   
+
+    // Initialise programming DCC output - under PPI control
+    err_code = nrf_drv_gpiote_out_init(PROG_DCC_PIN_NO, &config_out_toggle_false);
+    APP_ERROR_CHECK(err_code);
+    nrf_drv_gpiote_out_task_enable(PROG_DCC_PIN_NO);
+
+    // Initialise thermal input - generates GPIOTE event
+    config_in.pull = NRF_GPIO_PIN_PULLUP;
+    err_code = nrf_drv_gpiote_in_init(THERMAL_N_PIN_NO, &config_in, thermal_n_hi_to_lo_handler);
+    APP_ERROR_CHECK(err_code);
+
+    // Initialise overload/overtemperature LED (start with no overload/overtemperature) - under CPU control
+    err_code = nrf_drv_gpiote_out_init(OVER_LED_PIN_NO, &config_out_simple_false);
+    APP_ERROR_CHECK(err_code);
+
+    // Initialise BLE LED (start off) - under PPI control
+    err_code = nrf_drv_gpiote_out_init(BLE_LED_PIN_NO, &config_out_toggle_false);
+    APP_ERROR_CHECK(err_code);
+    nrf_drv_gpiote_out_task_enable(BLE_LED_PIN_NO);
+
+    // Initialise programming LED (start not in programming mode) - under CPU control
+    err_code = nrf_drv_gpiote_out_init(PROG_LED_PIN_NO, &config_out_simple_false);
+    APP_ERROR_CHECK(err_code);
+
+    // Enable the thermal interrupt only after all pins are conifigured
+    nrf_drv_gpiote_in_event_enable(THERMAL_N_PIN_NO, true);
+
+    // Check if thermal input is already low, and if so disable DCC
+    if (!nrf_drv_gpiote_in_is_set(THERMAL_N_PIN_NO))
+    {
+        //disable_DCC(ERROR_CODE_OVERTEMPERATURE);
+    }
+}
 
 
 /**@brief Function for initialising timers.
@@ -1776,74 +1800,85 @@ static void service_command_write_handler(ble_bluetrack_t * p_bluetrack, uint8_t
  */
 static void timers_init(void)
 {
-//    uint32_t err_code;
-//
-//    // Initialise TIMER1
-//    NRF_TIMER1->PRESCALER = TIMER1_PRESCALER_VAL;
-//    // Short timer completion to clear
-//    NRF_TIMER1->SHORTS = TIMER_SHORTS_COMPARE0_CLEAR_Msk;
-//    // Set initial timeout corresponding to a DCC one
-//    NRF_TIMER1->CC[0] = DCC_ONE_CC_VAL;
-//    NRF_TIMER1->INTENSET = TIMER_INTENSET_COMPARE0_Msk;
-//    // Register TIMER1 interrupt with softdevice
-//    NVIC_SetPriority(TIMER1_IRQn, TIMER1_IRQ_PRI);
-//    NVIC_ClearPendingIRQ(TIMER1_IRQn);
-//    NVIC_EnableIRQ(TIMER1_IRQn);
-//
-//    // Initialise TIMER2 to LED flash timing
-//    NRF_TIMER2->PRESCALER = TIMER2_PRESCALER_VAL_LED;
-//    // Short timer completion to clear
-//    NRF_TIMER2->SHORTS = TIMER_SHORTS_COMPARE0_CLEAR_Msk;
-//    NRF_TIMER2->CC[0] = TIMER2_CC_VAL_LED;
-//
-//    // Initialise application timer, with the scheduler.
-//    APP_TIMER_INIT(APP_TIMER_PRESCALER, APP_TIMER_MAX_TIMERS, APP_TIMER_OP_QUEUE_SIZE, true);
-//    // Create output application timer
-//    err_code = app_timer_create(&output_timer, APP_TIMER_MODE_SINGLE_SHOT, output_timer_timeout_handler);
-//    APP_ERROR_CHECK(err_code);
-//    // Create feedback application timer
-//    err_code = app_timer_create(&feedback_timer, APP_TIMER_MODE_SINGLE_SHOT, feedback_timer_timeout_handler);
-//    APP_ERROR_CHECK(err_code);
+    ret_code_t             err_code;
+    nrf_drv_timer_config_t timer_cfg = NRF_DRV_TIMER_DEFAULT_CONFIG;
+
+    timer_cfg.frequency = NRF_TIMER_FREQ_1MHz;
+    timer_cfg.bit_width = NRF_TIMER_BIT_WIDTH_32;
+
+    // Initialise DCC_DATA timer (initially outputs 1s)
+    err_code = nrf_drv_timer_init(&TIMER_DCC_DATA, &timer_cfg, timer_dcc_data_event_handler);
+    APP_ERROR_CHECK(err_code);
+    nrf_drv_timer_extended_compare(&TIMER_DCC_DATA, NRF_TIMER_CC_CHANNEL0, nrf_drv_timer_us_to_ticks(&TIMER_DCC_DATA, DCC_ONE_TIME_US), NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK, true);
+
+    // Initialise BLE_LED timer
+    err_code = nrf_drv_timer_init(&TIMER_BLE_LED, &timer_cfg, dummy_timer_event_handler);
+    APP_ERROR_CHECK(err_code);
+    nrf_drv_timer_extended_compare(&TIMER_BLE_LED, NRF_TIMER_CC_CHANNEL0, nrf_drv_timer_ms_to_ticks(&TIMER_BLE_LED, BLE_LED_TOGGLE_TIME_MS), NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK, false);
+
+    // Initialise DCC_CONTINOUS_ONES timer (always outputs 1s)
+    err_code = nrf_drv_timer_init(&TIMER_DCC_CONTINOUS_ONES, &timer_cfg, dummy_timer_event_handler);
+    APP_ERROR_CHECK(err_code);
+    nrf_drv_timer_extended_compare(&TIMER_DCC_CONTINOUS_ONES, NRF_TIMER_CC_CHANNEL0, nrf_drv_timer_us_to_ticks(&TIMER_DCC_CONTINOUS_ONES, DCC_ONE_TIME_US), NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK, false);
 
     // Initialize timer module
-    ret_code_t err_code = app_timer_init();
+    err_code = app_timer_init();
     APP_ERROR_CHECK(err_code);
+
+    // Create output application timer
+    //err_code = app_timer_create(&output_timer, APP_TIMER_MODE_SINGLE_SHOT, output_timer_timeout_handler);
+    //APP_ERROR_CHECK(err_code);
+    // Create feedback application timer
+    //err_code = app_timer_create(&feedback_timer, APP_TIMER_MODE_SINGLE_SHOT, feedback_timer_timeout_handler);
+    //APP_ERROR_CHECK(err_code);
 }
 
 
 /** @brief Function for initialising the Programmable Peripheral Interconnect (PPI) module.
  *
- * @details Channels 0, 1, and 2 are used for the BLE LED, DCC Output, and DCC Programming Output respectively. These channels are not used by the softdevice.
- * As the softdevice controls access to the PPI, this configuration is done through softdevice calls. 
+ * @details PPI is used for BLE LED, DCC Output, and DCC Programming Output.
  */
-//static void ppi_init(void)
-//{
-//    uint32_t err_code;
-//
-//    // Configure PPI channel 0 to toggle GPIOTE OUT[1] (BLE LED) on every TIMER2 COMPARE[0] match
-//    err_code = sd_ppi_channel_assign(0, &NRF_TIMER2->EVENTS_COMPARE[0], &NRF_GPIOTE->TASKS_OUT[1]);
-//    APP_ERROR_CHECK(err_code);
-//
-//    // Enable PPI channel 0
-//    err_code = sd_ppi_channel_enable_set(PPI_CHEN_CH0_Enabled << PPI_CHEN_CH0_Pos);
-//    APP_ERROR_CHECK(err_code);
-//
-//    // Configure PPI channel 1 to toggle GPIOTE OUT[2] (DCC Output) on every TIMER1 COMPARE[0] match
-//    err_code = sd_ppi_channel_assign(1, &NRF_TIMER1->EVENTS_COMPARE[0], &NRF_GPIOTE->TASKS_OUT[2]);
-//    APP_ERROR_CHECK(err_code);
-//
-//    // Enable PPI channel 1
-//    err_code = sd_ppi_channel_enable_set(PPI_CHEN_CH1_Enabled << PPI_CHEN_CH1_Pos);
-//    APP_ERROR_CHECK(err_code);
-//    
-//    // Configure PPI channel 2 to toggle GPIOTE OUT[3] (DCC Programming Output) on every TIMER2 COMPARE[0] match
-//    err_code = sd_ppi_channel_assign(2, &NRF_TIMER2->EVENTS_COMPARE[0], &NRF_GPIOTE->TASKS_OUT[3]);
-//    APP_ERROR_CHECK(err_code);
-//    
-//    // Enable PPI channel 2
-//    err_code = sd_ppi_channel_enable_set(PPI_CHEN_CH2_Enabled << PPI_CHEN_CH2_Pos);
-//    APP_ERROR_CHECK(err_code);
-//}
+static void ppi_init(void)
+{
+    ret_code_t        err_code;
+
+    err_code = nrf_drv_ppi_init();
+    APP_ERROR_CHECK(err_code);
+
+    // Allocate, assign, and enable BLE LED PPI channel (note don't need to retain this channel)
+    err_code = nrf_drv_ppi_channel_alloc(&ble_led_timer_to_ble_led);
+    APP_ERROR_CHECK(err_code);
+    err_code = nrf_drv_ppi_channel_assign(ble_led_timer_to_ble_led, nrf_drv_timer_event_address_get(&TIMER_BLE_LED, NRF_TIMER_EVENT_COMPARE0), nrf_drv_gpiote_out_task_addr_get(BLE_LED_PIN_NO));
+    APP_ERROR_CHECK(err_code);
+    nrf_drv_ppi_channel_enable(ble_led_timer_to_ble_led);
+    APP_ERROR_CHECK(err_code);
+
+    // Allocate, assign, and enable DCC Output PPI channels (note DCC Data is enabled initially)
+    err_code = nrf_drv_ppi_channel_alloc(&dcc_data_to_main_dcc);
+    APP_ERROR_CHECK(err_code);
+    err_code = nrf_drv_ppi_channel_assign(dcc_data_to_main_dcc, nrf_drv_timer_event_address_get(&TIMER_DCC_DATA, NRF_TIMER_EVENT_COMPARE0), nrf_drv_gpiote_out_task_addr_get(MAIN_DCC_PIN_NO));
+    APP_ERROR_CHECK(err_code);
+    nrf_drv_ppi_channel_enable(dcc_data_to_main_dcc);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = nrf_drv_ppi_channel_alloc(&dcc_continuous_ones_to_main_dcc);
+    APP_ERROR_CHECK(err_code);
+    err_code = nrf_drv_ppi_channel_assign(dcc_continuous_ones_to_main_dcc, nrf_drv_timer_event_address_get(&TIMER_DCC_CONTINOUS_ONES, NRF_TIMER_EVENT_COMPARE0), nrf_drv_gpiote_out_task_addr_get(MAIN_DCC_PIN_NO));
+    APP_ERROR_CHECK(err_code);
+
+    // Allocate, assign, and enable Programming DCC Output PPI channels (note DCC Continuous Ones is enabled initially)
+    err_code = nrf_drv_ppi_channel_alloc(&dcc_continuous_ones_to_prog_dcc);
+    APP_ERROR_CHECK(err_code);
+    err_code = nrf_drv_ppi_channel_assign(dcc_continuous_ones_to_prog_dcc, nrf_drv_timer_event_address_get(&TIMER_DCC_CONTINOUS_ONES, NRF_TIMER_EVENT_COMPARE0), nrf_drv_gpiote_out_task_addr_get(PROG_DCC_PIN_NO));
+    APP_ERROR_CHECK(err_code);
+    nrf_drv_ppi_channel_enable(dcc_continuous_ones_to_prog_dcc);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = nrf_drv_ppi_channel_alloc(&dcc_data_to_prog_dcc);
+    APP_ERROR_CHECK(err_code);
+    err_code = nrf_drv_ppi_channel_assign(dcc_data_to_prog_dcc, nrf_drv_timer_event_address_get(&TIMER_DCC_DATA, NRF_TIMER_EVENT_COMPARE0), nrf_drv_gpiote_out_task_addr_get(PROG_DCC_PIN_NO));
+    APP_ERROR_CHECK(err_code);
+}
 
 
 /**@brief Function for initializing the LPCOMP module.
@@ -1967,20 +2002,19 @@ static void scheduler_init(void)
 
 /**@brief Function for starting timers.
 */
-//static void timers_start(void)
-//{
-//    uint32_t err_code;
-//
-//    // Start relay timer
-//    err_code = app_timer_start(output_timer, APP_TIMER_TICKS(ACTUATION_INTERVAL, APP_TIMER_PRESCALER), NULL);
-//    APP_ERROR_CHECK(err_code);
-//
-//    // Start DCC output timer
-//    NRF_TIMER1->TASKS_START = 1;
-//    
-//    // Start LED and programming DCC output timer
-//    NRF_TIMER2->TASKS_START = 1;
-//}
+static void timers_start(void)
+{
+    //uint32_t err_code;
+
+    nrf_drv_timer_enable(&TIMER_DCC_DATA);
+    nrf_drv_timer_enable(&TIMER_BLE_LED);
+    nrf_drv_timer_enable(&TIMER_DCC_CONTINOUS_ONES);
+
+    // Start relay timer
+    //err_code = app_timer_start(output_timer, APP_TIMER_TICKS(ACTUATION_INTERVAL, APP_TIMER_PRESCALER), NULL);
+    //APP_ERROR_CHECK(err_code);
+
+}
 
 
 /**@brief Callback function for asserts in the SoftDevice.
@@ -2249,18 +2283,13 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
     {
         case BLE_GAP_EVT_CONNECTED:
             NRF_LOG_INFO("Connected");
-//            // Remove LED from GPIOTE control
-//            NRF_GPIOTE->CONFIG[1] &= ~GPIOTE_CONFIG_MODE_Msk;
-//            NRF_GPIOTE->CONFIG[1] |= GPIOTE_CONFIG_MODE_Disabled << GPIOTE_CONFIG_MODE_Pos;
-//            
-//            // Reconfigure TIMER2 for DCC output
-//            NRF_TIMER2->TASKS_STOP = 1;
-//            NRF_TIMER2->PRESCALER = TIMER2_PRESCALER_VAL_DCC;
-//            NRF_TIMER2->CC[0] = DCC_ONE_CC_VAL;
-//            NRF_TIMER2->TASKS_START = 1;
-//            
-//            // Set LED
-//            nrf_gpio_pin_set(BLE_LED_PIN_NO);
+
+            // Disable timer control of BLE LED
+            nrf_drv_ppi_channel_disable(ble_led_timer_to_ble_led);
+            APP_ERROR_CHECK(err_code);
+
+            // Turn on BLE LED
+            nrf_drv_gpiote_out_task_force(BLE_LED_PIN_NO, true);
 
             m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
             err_code = nrf_ble_qwr_conn_handle_assign(&m_qwr, m_conn_handle);
@@ -2269,16 +2298,11 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 
         case BLE_GAP_EVT_DISCONNECTED:
             NRF_LOG_INFO("Disconnected");
-//            // Reconfigure TIMER2 for LED output
-//            NRF_TIMER2->TASKS_STOP = 1;
-//            NRF_TIMER2->PRESCALER = TIMER2_PRESCALER_VAL_LED;
-//            NRF_TIMER2->CC[0] = TIMER2_CC_VAL_LED;
-//            NRF_TIMER2->TASKS_START = 1;
-//            
-//            // Restore LED to GPIOTE control
-//            NRF_GPIOTE->CONFIG[1] &= ~GPIOTE_CONFIG_MODE_Msk;
-//            NRF_GPIOTE->CONFIG[1] |= GPIOTE_CONFIG_MODE_Task << GPIOTE_CONFIG_MODE_Pos;
-//            
+      
+            // Enable timer control of BLE LED
+            nrf_drv_ppi_channel_enable(ble_led_timer_to_ble_led);
+            APP_ERROR_CHECK(err_code);
+            
             m_conn_handle = BLE_CONN_HANDLE_INVALID;
 
 //            // Remove all pending periodic speed commands
@@ -2426,8 +2450,7 @@ static void idle_state_handle(void)
 int main(void)
 {
     // Initialize
-//    gio_init();
-//    gpiote_init();
+    gpiote_init();
     timers_init();
     log_init();
     power_management_init();
@@ -2438,14 +2461,14 @@ int main(void)
     services_init();
     advertising_init();
     conn_params_init();
-//    ppi_init();
+    ppi_init();
 //    lpcomp_init();
 //    adc_init();
 //    bluetrack_init();
 
     // Start execution
     NRF_LOG_INFO("Bluetrack started.");
-//    timers_start();
+    timers_start();
     advertising_start();
 
     // Enter main loop
