@@ -1349,7 +1349,7 @@ void timer_dcc_data_event_handler(nrf_timer_event_t event_type, void* p_context)
             // Send data
             phase1_complete = true;
             phase2_complete = false;
-            nrf_timer_cc_write(TIMER_DCC_DATA.p_reg, NRF_TIMER_CC_CHANNEL0, nrf_drv_timer_us_to_ticks(&TIMER_DCC_DATA, DCC_ONE_TIME_US));//dcc_output_state ? nrf_drv_timer_us_to_ticks(&TIMER_DCC_DATA, DCC_ONE_TIME_US) : nrf_drv_timer_us_to_ticks(&TIMER_DCC_DATA, DCC_ZERO_TIME_US));
+            nrf_timer_cc_write(TIMER_DCC_DATA.p_reg, NRF_TIMER_CC_CHANNEL0, dcc_output_state ? nrf_drv_timer_us_to_ticks(&TIMER_DCC_DATA, DCC_ONE_TIME_US) : nrf_drv_timer_us_to_ticks(&TIMER_DCC_DATA, DCC_ZERO_TIME_US));
 
             // Check for exhaustion and unset occupied
             if (active_packet->data2_count == 0)
@@ -1736,6 +1736,9 @@ static void timers_init(void)
     err_code = nrf_drv_timer_init(&TIMER_DCC_DATA, &timer_cfg, timer_dcc_data_event_handler);
     APP_ERROR_CHECK(err_code);
     nrf_drv_timer_extended_compare(&TIMER_DCC_DATA, NRF_TIMER_CC_CHANNEL0, nrf_drv_timer_us_to_ticks(&TIMER_DCC_DATA, DCC_ONE_TIME_US), NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK, true);
+
+    // Implement a constant CC to guard against missing a COMPARE event when we change from ZERO to ONE and the interrupt handler is delayed
+    nrf_drv_timer_extended_compare(&TIMER_DCC_DATA, NRF_TIMER_CC_CHANNEL1, nrf_drv_timer_us_to_ticks(&TIMER_DCC_DATA, DCC_ZERO_TIME_US), NRF_TIMER_SHORT_COMPARE1_CLEAR_MASK, false);
 
     // Initialise BLE_LED timer
     err_code = nrf_drv_timer_init(&TIMER_BLE_LED, &timer_cfg, dummy_timer_event_handler);
@@ -2392,9 +2395,9 @@ static void idle_state_handle(void)
 int main(void)
 {
     // Initialize
+    log_init();
     gpiote_init();
     timers_init();
-    log_init();
     power_management_init();
     ble_stack_init();
     scheduler_init();
