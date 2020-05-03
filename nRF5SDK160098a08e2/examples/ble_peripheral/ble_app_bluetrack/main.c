@@ -108,8 +108,8 @@
                                                                                      
                                                                                      This allows detection of the minimum 60mA delta specified in S-9.2.3 */
 
-//#define MIN_DCC_LEN                     2                                           /**< Minimum length (in bytes) of a DCC command (excluding error byte, see S-9.2.1) */
-//#define MAX_DCC_LEN                     5                                           /**< Maximum length (in bytes) of a DCC command (excluding error byte, see S-9.2.1) */
+#define MIN_DCC_LEN                     2                                           /**< Minimum length (in bytes) of a DCC command (excluding error byte, see S-9.2.1) */
+#define MAX_DCC_LEN                     5                                           /**< Maximum length (in bytes) of a DCC command (excluding error byte, see S-9.2.1) */
 
 //#define TIMER1_IRQ_PRI                  APP_IRQ_PRIORITY_HIGH                       /**< Set priority of DCC timer to application high */
 //#define TIMER1_PRESCALER_VAL            0                                           /**< Set base period to 62.5ns */
@@ -131,33 +131,33 @@
 //#define UART_FIFO_TX_SIZE               128                                         /**< UART TX FIFO size (must be power of 2) */
 //#define UART_FIFO_RX_SIZE               128                                         /**< UART RX FIFO size (must be power of 2) */
 
-//#define DCC_COMMAND_BUFFER_SIZE         52                                          /**< Size of DCC Command buffer, this is 32+20 for worst case service mode*/
+#define DCC_COMMAND_BUFFER_SIZE         52                                          /**< Size of DCC Command buffer, this is 32+20 for worst case service mode*/
 
-#define ACTUATION_INTERVAL_MS            1000                                        /**< Relay actuation interval (ms) (1s seems reasonable to guarantee actuation) */
+#define ACTUATION_INTERVAL_MS           1000                                        /**< Relay actuation interval (ms) (1s seems reasonable to guarantee actuation) */
 
-//#define ADC_SAMPLE_INTERVAL             0.5                                         /**< ADC sample interval (ms) (this allows at least 10 samples during a minimum 5ms feedback window, see S-9.2.3) */
+#define ADC_SAMPLE_INTERVAL_MS          0.5                                         /**< ADC sample interval (ms) (this allows at least 10 samples during a minimum 5ms feedback window, see S-9.2.3) */
 
-//#define FUNCTION_READ_BIT               1                                           /**< Enum for read_bit function */
-//#define FUNCTION_READ_BYTE              2                                           /**< Enum for read_byte function */
-//#define FUNCTION_WRITE_BIT              3                                           /**< Enum for write_bit function */
-//#define FUNCTION_WRITE_BYTE             4                                           /**< Enum for write_byte function */
-//#define MODE_DIRECT                     1                                           /**< Enum for direct mode */
-//#define MODE_PAGED                      2                                           /**< Enum for paged mode */
-//#define MODE_REGISTER                   3                                           /**< Enum for register mode */
-//#define MODE_ADDRESS                    4                                           /**< Enum for address mode */
-//#define READ_BYTE_COUNTER_MAX           255                                         /**< Maximum value for the read byte counter (maximum value of 8 bit unsigned integer) */
-//#define READ_BIT_COUNTER_MAX            7                                           /**< Maximum value for the read bit counter (8-1) */
-//#define READ_BIT_COUNTER_MAX_ADDRESS    127                                         /**< Maximum value for the read byte counter when in address mode (short address cannot be greater than 127) */
+#define FUNCTION_READ_BIT               1                                           /**< Enum for read_bit function */
+#define FUNCTION_READ_BYTE              2                                           /**< Enum for read_byte function */
+#define FUNCTION_WRITE_BIT              3                                           /**< Enum for write_bit function */
+#define FUNCTION_WRITE_BYTE             4                                           /**< Enum for write_byte function */
+#define MODE_DIRECT                     1                                           /**< Enum for direct mode */
+#define MODE_PAGED                      2                                           /**< Enum for paged mode */
+#define MODE_REGISTER                   3                                           /**< Enum for register mode */
+#define MODE_ADDRESS                    4                                           /**< Enum for address mode */
+#define READ_BYTE_COUNTER_MAX           255                                         /**< Maximum value for the read byte counter (maximum value of 8 bit unsigned integer) */
+#define READ_BIT_COUNTER_MAX            7                                           /**< Maximum value for the read bit counter (8-1) */
+#define READ_BIT_COUNTER_MAX_ADDRESS    127                                         /**< Maximum value for the read byte counter when in address mode (short address cannot be greater than 127) */
 
-//#define ADDRESS_TYPE_INVALID            0                                           /**< Enum for invalid address type */
-//#define ADDRESS_TYPE_BROADCAST          1                                           /**< Enum for broadcast address type */
-//#define ADDRESS_TYPE_SHORT_CONSIST      2                                           /**< Enum for short or consist address type */
-//#define ADDRESS_TYPE_LONG               3                                           /**< Enum for long address type */
-//
-//#define COMMAND_REPEATS                 10                                          /**< Number of times to repeat a DCC command (arbitrary selection) */
-//
-//#define SPEED_COMMAND_ARRAY_SIZE        128                                         /**< Number of addresses we can store a speed command for. This places a limitation on the number of trains we can concurrently support. */
-//
+#define ADDRESS_TYPE_INVALID            0                                           /**< Enum for invalid address type */
+#define ADDRESS_TYPE_BROADCAST          1                                           /**< Enum for broadcast address type */
+#define ADDRESS_TYPE_SHORT_CONSIST      2                                           /**< Enum for short or consist address type */
+#define ADDRESS_TYPE_LONG               3                                           /**< Enum for long address type */
+
+#define COMMAND_REPEATS                 10                                          /**< Number of times to repeat a DCC command (arbitrary selection) */
+
+#define SPEED_COMMAND_ARRAY_SIZE        128                                         /**< Number of addresses we can store a speed command for. This places a limitation on the number of trains we can concurrently support. */
+
 #define MAIN                            0                                           /**< Indicates DCC commands are sent to the main track, used by both programming_track_state and programming_track_mode. */
 #define PROGRAMMING                     1                                           /**< Indicates DCC commands are sent to the programming track, used by both programming_track_state and programming_track_mode. */
 #define MAIN_REPEAT                     2                                           /**< Indicates repeating DCC commands are being sent to the main track in programming mode, only used by programming_track_state. */
@@ -200,30 +200,30 @@
 #define SCHED_QUEUE_SIZE                10                                          /**< Maximum number of events in the scheduler queue. This is a best guess. */
 
 /**@brief Structure of a DCC command. */
-//typedef struct
-//{
-//    bool occupied;
-//    bool sync;
-//    bool feedback;
-//    uint32_t data0;
-//    uint32_t data1;
-//    uint32_t data2;
-//    uint8_t data0_count;
-//    uint8_t data1_count;
-//    uint8_t data2_count;
-//} dcc_command_t;
+typedef struct
+{
+    bool occupied;
+    bool sync;
+    bool feedback;
+    uint32_t data0;
+    uint32_t data1;
+    uint32_t data2;
+    uint8_t data0_count;
+    uint8_t data1_count;
+    uint8_t data2_count;
+} dcc_command_t;
 
 /**@brief Structure of a scheduled DCC command. */
-//typedef struct
-//{
-//    uint8_t byte1;
-//    uint8_t byte2;
-//    uint8_t byte3;
-//    uint8_t byte4;
-//    uint8_t byte5;
-//    uint8_t len;
-//    uint8_t feedback;
-//} scheduled_dcc_command_t;
+typedef struct
+{
+    uint8_t byte1;
+    uint8_t byte2;
+    uint8_t byte3;
+    uint8_t byte4;
+    uint8_t byte5;
+    uint8_t len;
+    uint8_t feedback;
+} scheduled_dcc_command_t;
 
 BLE_BLUETRACK_DEF(m_bluetrack);                                                 /**< Bluetrack Service instance. */
 NRF_BLE_GATT_DEF(m_gatt);                                                       /**< GATT module instance. */
@@ -268,8 +268,8 @@ static nrf_ppi_channel_t dcc_continuous_ones_to_prog_dcc;
 //static ble_bluetrack_t                  m_bluetrack;                                          /**< BlueTrack service structure instance */
 
 APP_TIMER_DEF(output_timer);                                                                  /**< App Timer instance for relay output timing */
+APP_TIMER_DEF(feedback_timer);                                                                /**< App Timer instance for feedback ADC measurement timing */
 
-//static app_timer_id_t                   feedback_timer;                                       /**< App Timer instance for feedback ADC measurement timing */
 static nrf_drv_gpiote_pin_t             output_pin[N_OUTPUTS] = {RELAY_1_PIN_NO,              /**< Pin Number storage for the relay outputs */
                                                                  RELAY_2_PIN_NO,
                                                                  RELAY_3_PIN_NO,
@@ -285,50 +285,50 @@ static nrf_drv_gpiote_pin_t             output_pin[N_OUTPUTS] = {RELAY_1_PIN_NO,
                                                                  RELAY_13_PIN_NO,
                                                                  RELAY_14_PIN_NO};
 static bool                             output_flags[N_OUTPUTS];                              /**< Flags for requesting relay activation */
-//static dcc_command_t                    dcc_command_buffer[DCC_COMMAND_BUFFER_SIZE];          /**< DCC command buffer that stores pending commands */
-//static uint8_t                          producer_index;                                       /**< Index of the next available DCC command buffer slot that can be filled */
-//static uint8_t                          consumer_index;                                       /**< Index of the DCC command buffer slot currently being transmitted */
-//static bool                             phase1_complete;                                      /**< Flag to control phases of DCC command */
-//static bool                             phase2_complete;                                      /**< Flag to control phases of DCC command */
+static dcc_command_t                    dcc_command_buffer[DCC_COMMAND_BUFFER_SIZE];          /**< DCC command buffer that stores pending commands */
+static uint8_t                          producer_index;                                       /**< Index of the next available DCC command buffer slot that can be filled */
+static uint8_t                          consumer_index;                                       /**< Index of the DCC command buffer slot currently being transmitted */
+static bool                             phase1_complete;                                      /**< Flag to control phases of DCC command */
+static bool                             phase2_complete;                                      /**< Flag to control phases of DCC command */
 //static bool                             dcc_output_state;                                     /**< Flag to track whether we are currently outputting a DCC 1 or 0 */
 static bool                             dcc_disabled;                                         /**< Flag to indicate whether DCC has been disabled completely */
-//static bool                             adc_baseline_flag;                                    /**< Flag to indicate to the ADC it should store its result as a baseline */
-//static uint32_t                         adc_baseline;                                         /**< Baseline of current feedback measurement */
-//static bool                             feedback_window_end;                                  /**< Flag to indicate that the feedback window should end */
-//static bool                             feedback_in_progress;                                 /**< Flag to indicate whether we are monitoring for feedback */
-//static bool                             acknowledge;                                          /**< Flag to indicate an acknowledge was received during feedback */
-//static bool                             service_command_pending;                              /**< Flag to indicate whether a service command is pending */
-//static bool                             service_command_in_progress;                          /**< Flag to indicate whether a service command is in progress */
+static bool                             adc_baseline_flag;                                    /**< Flag to indicate to the ADC it should store its result as a baseline */
+static uint32_t                         adc_baseline;                                         /**< Baseline of current feedback measurement */
+static bool                             feedback_window_end;                                  /**< Flag to indicate that the feedback window should end */
+static bool                             feedback_in_progress;                                 /**< Flag to indicate whether we are monitoring for feedback */
+static bool                             acknowledge;                                          /**< Flag to indicate an acknowledge was received during feedback */
+static bool                             service_command_pending;                              /**< Flag to indicate whether a service command is pending */
+static bool                             service_command_in_progress;                          /**< Flag to indicate whether a service command is in progress */
 static uint8_t                          programming_track_mode;                               /**< Variable to keep track of programming track mode, this is the mode requested by the characteristic */
-//static uint8_t                          programming_track_state;                              /**< Variable to keep track of programming track state */
-//static uint8_t                          function;                                             /**< Function of the service command pending/in progress */
-//static uint8_t                          mode;                                                 /**< Mode of the service command pending/in progress */
-//static uint8_t                          CV_or_reg_upper;                                      /**< Upper portion of CV or register of the service command pending/in progress */
-//static uint8_t                          CV_or_reg_lower;                                      /**< Lower portion of CV or register of the service command pending/in progress */
-//static uint8_t                          value;                                                /**< Value to be written of the service command pending/in progress */
-//static uint16_t                         read_byte_counter;                                    /**< Read byte counter of the service command pending/in progress */
-//static uint8_t                          read_bit_counter;                                     /**< Read bit counter of the service command pending/in progress */
-//static uint8_t                          read_bit_value;                                       /**< Read bit response of the service command pending/in progress */
-//static dcc_command_t                    idle_packet;                                          /**< Memory reserved to transmit idle packets */
-//static uint32_t                         active_speed_command_index;                           /**< Current place in the speed command array */
-//static dcc_command_t                    speed_command_array_temp[SPEED_COMMAND_ARRAY_SIZE];   /**< Array for sending periodic speed commands */
-//static dcc_command_t                    speed_command_array[SPEED_COMMAND_ARRAY_SIZE];        /**< Array for storing periodic speed commands */
-//static uint8_t                          speed_command_address_type[SPEED_COMMAND_ARRAY_SIZE]; /**< Array for keeping track of the address type the corresponding periodic speed command applies to */
-//static uint16_t                         speed_command_address[SPEED_COMMAND_ARRAY_SIZE];      /**< Array for keeping track of the address the corresponding periodic speed command applies to */
+static uint8_t                          programming_track_state;                              /**< Variable to keep track of programming track state */
+static uint8_t                          function;                                             /**< Function of the service command pending/in progress */
+static uint8_t                          mode;                                                 /**< Mode of the service command pending/in progress */
+static uint8_t                          CV_or_reg_upper;                                      /**< Upper portion of CV or register of the service command pending/in progress */
+static uint8_t                          CV_or_reg_lower;                                      /**< Lower portion of CV or register of the service command pending/in progress */
+static uint8_t                          value;                                                /**< Value to be written of the service command pending/in progress */
+static uint16_t                         read_byte_counter;                                    /**< Read byte counter of the service command pending/in progress */
+static uint8_t                          read_bit_counter;                                     /**< Read bit counter of the service command pending/in progress */
+static uint8_t                          read_bit_value;                                       /**< Read bit response of the service command pending/in progress */
+static dcc_command_t                    idle_packet;                                          /**< Memory reserved to transmit idle packets */
+static uint32_t                         active_speed_command_index;                           /**< Current place in the speed command array */
+static dcc_command_t                    speed_command_array_temp[SPEED_COMMAND_ARRAY_SIZE];   /**< Array for sending periodic speed commands */
+static dcc_command_t                    speed_command_array[SPEED_COMMAND_ARRAY_SIZE];        /**< Array for storing periodic speed commands */
+static uint8_t                          speed_command_address_type[SPEED_COMMAND_ARRAY_SIZE]; /**< Array for keeping track of the address type the corresponding periodic speed command applies to */
+static uint16_t                         speed_command_address[SPEED_COMMAND_ARRAY_SIZE];      /**< Array for keeping track of the address the corresponding periodic speed command applies to */
 
 
 /**@brief Function for removing all periodic speed commands
  */
-//static void remove_all_speed_commands (void)
-//{
-//    uint32_t i;
-//    for (i = 0; i < SPEED_COMMAND_ARRAY_SIZE; i++)
-//    {
-//        speed_command_array[i].occupied = false;
-//        speed_command_array_temp[i].occupied = false;
-//        speed_command_address_type[i] = ADDRESS_TYPE_INVALID;
-//    }
-//}
+static void remove_all_speed_commands (void)
+{
+    uint32_t i;
+    for (i = 0; i < SPEED_COMMAND_ARRAY_SIZE; i++)
+    {
+        speed_command_array[i].occupied = false;
+        speed_command_array_temp[i].occupied = false;
+        speed_command_address_type[i] = ADDRESS_TYPE_INVALID;
+    }
+}
 
 
 /**@brief Function for disabling the DCC output.
@@ -362,27 +362,27 @@ static void disable_DCC (uint8_t error_code)
 
 /**@brief Function for identifying an appropriate index for a periodic speed command. Returns SPEED_COMMAND_ARRAY_SIZE if full.
  */
-//static uint8_t index_for_periodic_speed_command(uint8_t address_type, uint16_t address)
-//{
-//    uint8_t i;
-//    uint8_t vacant = SPEED_COMMAND_ARRAY_SIZE;
-//    for (i = 0; i < SPEED_COMMAND_ARRAY_SIZE; i++)
-//    {
-//        if (speed_command_address_type[i] == ADDRESS_TYPE_INVALID)
-//        {
-//            // We've found a vacant index, store it
-//            vacant = i;
-//        }
-//        else if ((speed_command_address_type[i] == address_type) && (speed_command_address[i] == address))
-//        {
-//            // We've found a corresponding entry
-//            return i;
-//        }
-//    }
-//    
-//    // We made it here without finding a corresponding entry, simply return vacant
-//    return vacant;
-//}
+static uint8_t index_for_periodic_speed_command(uint8_t address_type, uint16_t address)
+{
+    uint8_t i;
+    uint8_t vacant = SPEED_COMMAND_ARRAY_SIZE;
+    for (i = 0; i < SPEED_COMMAND_ARRAY_SIZE; i++)
+    {
+        if (speed_command_address_type[i] == ADDRESS_TYPE_INVALID)
+        {
+            // We've found a vacant index, store it
+            vacant = i;
+        }
+        else if ((speed_command_address_type[i] == address_type) && (speed_command_address[i] == address))
+        {
+            // We've found a corresponding entry
+            return i;
+        }
+    }
+    
+    // We made it here without finding a corresponding entry, simply return vacant
+    return vacant;
+}
 
 
 /**@brief Function for handling a write to the Address characteristic.
@@ -418,77 +418,77 @@ static void address_write_handler(ble_bluetrack_t * p_bluetrack, uint8_t address
  * @param[in]   len            Length of DCC command in bytes.
  * @param[in]   feedback       Flag to indicate whether a feedback window should be opened for this command.
  */
-//static void enqueue_dcc_command (uint8_t byte1, uint8_t byte2, uint8_t byte3, uint8_t byte4, uint8_t byte5, uint8_t len, uint8_t feedback, dcc_command_t *enqueued_command)
-//{
-//    uint8_t next_producer_index;
-//    
-//    // First check for valid length
-//    if (len >= MIN_DCC_LEN && len <= MAX_DCC_LEN)
-//    {
-//        next_producer_index = producer_index + 1;
-//        // Reset next producer index if we have overflowed
-//        if (next_producer_index == DCC_COMMAND_BUFFER_SIZE)
-//        {
-//            next_producer_index = 0;
-//        }
-//        
-//        // Only transmit if we have enough room to move to the next slot
-//        if (next_producer_index != consumer_index)
-//        {
-//            // Send a DCC packet (long preamble (20 bits) used to satisfy S-9.2.3)
-//            if (len == 2)
-//            {
-//                dcc_command_buffer[producer_index].data0 = 0xFFFFF000 | (byte1 << 3);
-//                dcc_command_buffer[producer_index].data0_count = 30;
-//                dcc_command_buffer[producer_index].data1 = 0x00004000 | (byte2 << 24) | ((byte1 ^ byte2) << 15);
-//                dcc_command_buffer[producer_index].data1_count = 18;
-//                dcc_command_buffer[producer_index].data2 = 0x80000000;
-//                dcc_command_buffer[producer_index].data2_count = 1;
-//            }
-//            else if (len == 3)
-//            {
-//                dcc_command_buffer[producer_index].data0 = 0xFFFFF000 | (byte1 << 3);
-//                dcc_command_buffer[producer_index].data0_count = 30;
-//                dcc_command_buffer[producer_index].data1 = 0x00000020 | (byte2 << 24) | (byte3 << 15) | ((byte1 ^ byte2 ^ byte3) << 6);
-//                dcc_command_buffer[producer_index].data1_count = 27;
-//                dcc_command_buffer[producer_index].data2 = 0x80000000;
-//                dcc_command_buffer[producer_index].data2_count = 1;
-//            }
-//            else if (len == 4)
-//            {
-//                dcc_command_buffer[producer_index].data0 = 0xFFFFF000 | (byte1 << 3);
-//                dcc_command_buffer[producer_index].data0_count = 30;
-//                dcc_command_buffer[producer_index].data1 = 0x00000000 | (byte2 << 24) | (byte3 << 15) | ((byte4) << 6);
-//                dcc_command_buffer[producer_index].data1_count = 27;
-//                dcc_command_buffer[producer_index].data2 = 0x00800000 | ((byte1 ^ byte2 ^ byte3 ^ byte4) << 24);
-//                dcc_command_buffer[producer_index].data2_count = 9;
-//            }
-//            else if (len == 5)
-//            {
-//                dcc_command_buffer[producer_index].data0 = 0xFFFFF000 | (byte1 << 3);
-//                dcc_command_buffer[producer_index].data0_count = 30;
-//                dcc_command_buffer[producer_index].data1 = 0x00000000 | (byte2 << 24) | (byte3 << 15) | ((byte4) << 6);
-//                dcc_command_buffer[producer_index].data1_count = 27;
-//                dcc_command_buffer[producer_index].data2 = 0x00004000 | (byte5 << 24) | ((byte1 ^ byte2 ^ byte3 ^ byte4 ^ byte5) << 15);
-//                dcc_command_buffer[producer_index].data2_count = 18;
-//            }
-//            
-//            dcc_command_buffer[producer_index].sync = true;
-//            dcc_command_buffer[producer_index].feedback = feedback ? true : false;
-//            
-//            // Return by reference, if required
-//            if (enqueued_command != NULL)
-//            {
-//                memcpy(enqueued_command, &dcc_command_buffer[producer_index], sizeof(dcc_command_t));
-//            }
-//            
-//            dcc_command_buffer[producer_index].occupied = true;
-//            
-//            // Advance producer index
-//            producer_index = next_producer_index;
-//        }
-//    }
-//}
+static void enqueue_dcc_command (uint8_t byte1, uint8_t byte2, uint8_t byte3, uint8_t byte4, uint8_t byte5, uint8_t len, uint8_t feedback, dcc_command_t *enqueued_command)
+{
+    uint8_t next_producer_index;
+    
+    // First check for valid length
+    if (len >= MIN_DCC_LEN && len <= MAX_DCC_LEN)
+    {
+        next_producer_index = producer_index + 1;
+        // Reset next producer index if we have overflowed
+        if (next_producer_index == DCC_COMMAND_BUFFER_SIZE)
+        {
+            next_producer_index = 0;
+        }
+        
+        // Only transmit if we have enough room to move to the next slot
+        if (next_producer_index != consumer_index)
+        {
+            // Send a DCC packet (long preamble (20 bits) used to satisfy S-9.2.3)
+            if (len == 2)
+            {
+                dcc_command_buffer[producer_index].data0 = 0xFFFFF000 | (byte1 << 3);
+                dcc_command_buffer[producer_index].data0_count = 30;
+                dcc_command_buffer[producer_index].data1 = 0x00004000 | (byte2 << 24) | ((byte1 ^ byte2) << 15);
+                dcc_command_buffer[producer_index].data1_count = 18;
+                dcc_command_buffer[producer_index].data2 = 0x80000000;
+                dcc_command_buffer[producer_index].data2_count = 1;
+            }
+            else if (len == 3)
+            {
+                dcc_command_buffer[producer_index].data0 = 0xFFFFF000 | (byte1 << 3);
+                dcc_command_buffer[producer_index].data0_count = 30;
+                dcc_command_buffer[producer_index].data1 = 0x00000020 | (byte2 << 24) | (byte3 << 15) | ((byte1 ^ byte2 ^ byte3) << 6);
+                dcc_command_buffer[producer_index].data1_count = 27;
+                dcc_command_buffer[producer_index].data2 = 0x80000000;
+                dcc_command_buffer[producer_index].data2_count = 1;
+            }
+            else if (len == 4)
+            {
+                dcc_command_buffer[producer_index].data0 = 0xFFFFF000 | (byte1 << 3);
+                dcc_command_buffer[producer_index].data0_count = 30;
+                dcc_command_buffer[producer_index].data1 = 0x00000000 | (byte2 << 24) | (byte3 << 15) | ((byte4) << 6);
+                dcc_command_buffer[producer_index].data1_count = 27;
+                dcc_command_buffer[producer_index].data2 = 0x00800000 | ((byte1 ^ byte2 ^ byte3 ^ byte4) << 24);
+                dcc_command_buffer[producer_index].data2_count = 9;
+            }
+            else if (len == 5)
+            {
+                dcc_command_buffer[producer_index].data0 = 0xFFFFF000 | (byte1 << 3);
+                dcc_command_buffer[producer_index].data0_count = 30;
+                dcc_command_buffer[producer_index].data1 = 0x00000000 | (byte2 << 24) | (byte3 << 15) | ((byte4) << 6);
+                dcc_command_buffer[producer_index].data1_count = 27;
+                dcc_command_buffer[producer_index].data2 = 0x00004000 | (byte5 << 24) | ((byte1 ^ byte2 ^ byte3 ^ byte4 ^ byte5) << 15);
+                dcc_command_buffer[producer_index].data2_count = 18;
+            }
+            
+            dcc_command_buffer[producer_index].sync = true;
+            dcc_command_buffer[producer_index].feedback = feedback ? true : false;
+            
+            // Return by reference, if required
+            if (enqueued_command != NULL)
+            {
+                memcpy(enqueued_command, &dcc_command_buffer[producer_index], sizeof(dcc_command_t));
+            }
+            
+            dcc_command_buffer[producer_index].occupied = true;
+            
+            // Advance producer index
+            producer_index = next_producer_index;
+        }
+    }
+}
 
 
 /**@brief Function for enqueing a DCC command from the scheduler.
@@ -498,119 +498,119 @@ static void address_write_handler(ble_bluetrack_t * p_bluetrack, uint8_t address
  * @param[in]   p_event_data   Pointer to scheduled_dcc_command data type.
  * @param[in]   event_size     Size of scheduled_dcc_command.
  */
-//void enqueue_dcc_command_from_scheduler (void *p_event_data, uint16_t event_size)
-//{
-//    uint8_t i;
-//    uint16_t address = 0;
-//    uint8_t address_type = ADDRESS_TYPE_INVALID;
-//    uint8_t command_byte, data_byte;
-//    uint8_t index;
-//    dcc_command_t speed_command;
-//    scheduled_dcc_command_t *p_scheduled_dcc_command;
-//    
-//    if (event_size == sizeof(scheduled_dcc_command_t))
-//    {
-//        p_scheduled_dcc_command = (scheduled_dcc_command_t *)p_event_data;
-//        
-//        // We send the command first to get a copy of the enqueued packet for the periodic speed command. We think we can do this because we assume this function will purge the periodic speed command array before the sent command (and its repetitions) makes it out on the rails, so if a stop is sent, the previous periodic speed command for that address will be purged before the DCC timer handler gets around to pulling it from the periodic speed command array after it clears the DCC buffer.
-//        
-//        // Repeat the command as required
-//        for (i = 0; i < COMMAND_REPEATS; i++)
-//        {
-//            enqueue_dcc_command(p_scheduled_dcc_command->byte1, p_scheduled_dcc_command->byte2, p_scheduled_dcc_command->byte3, p_scheduled_dcc_command->byte4, p_scheduled_dcc_command->byte5, p_scheduled_dcc_command->len, p_scheduled_dcc_command->feedback, &speed_command);
-//        }
-//        
-//        // If we have a reset or hard reset packet in operations mode sent to broadcast, short, or long addresses, queue up 10 idle packets to ensure the decoders don't enter service mode unintentionally
-//        if (((p_scheduled_dcc_command->byte1 <= 127) && ((p_scheduled_dcc_command->byte2 == 0x00) || (p_scheduled_dcc_command->byte2 == 0x01))) ||
-//            ((p_scheduled_dcc_command->byte1 >= 192) && (p_scheduled_dcc_command->byte1 <= 231) && ((p_scheduled_dcc_command->byte3 == 0x00) || (p_scheduled_dcc_command->byte3 == 0x01))))
-//        {
-//            for (i = 0; i < 10; i++)
-//            {
-//                enqueue_dcc_command(0xFF, 0, 0, 0, 0, 2, 0, NULL);
-//            }
-//        }
-//        
-//        // Only update the periodic speed commands when we are in main track mode
-//        if (programming_track_mode == MAIN)
-//        {
-//            // First identify the address (if valid)
-//            if (p_scheduled_dcc_command->byte1 == 0)
-//            {
-//                address_type = ADDRESS_TYPE_BROADCAST;
-//                address = p_scheduled_dcc_command->byte1;
-//                command_byte = p_scheduled_dcc_command->byte2;
-//                data_byte = p_scheduled_dcc_command->byte3;
-//            }
-//            else if ((p_scheduled_dcc_command->byte1 >= 1) && (p_scheduled_dcc_command->byte1 <= 127))
-//            {
-//                address_type = ADDRESS_TYPE_SHORT_CONSIST;
-//                address = p_scheduled_dcc_command->byte1;
-//                command_byte = p_scheduled_dcc_command->byte2;
-//                data_byte = p_scheduled_dcc_command->byte3;
-//            }
-//            else if ((p_scheduled_dcc_command->byte1 >= 192) && (p_scheduled_dcc_command->byte1 <= 231))
-//            {
-//                address_type = ADDRESS_TYPE_LONG;
-//                address = ((p_scheduled_dcc_command->byte1 & 0x3F) << 8) | p_scheduled_dcc_command->byte2;
-//                command_byte = p_scheduled_dcc_command->byte3;
-//                data_byte = p_scheduled_dcc_command->byte4;
-//            }
-//            
-//            // Now check if we have a speed command
-//            if (address_type != ADDRESS_TYPE_INVALID)
-//            {
-//                if (((command_byte == 0x3F) && ((data_byte & 0x7E) == 0)) || (((command_byte & 0xC0) == 0x40) && ((command_byte & 0x0E) == 0)))
-//                {
-//                    // We have a 128 step speed command or a 28 step speed command which is a stop or emergency stop
-//                    if (address_type == ADDRESS_TYPE_BROADCAST)
-//                    {
-//                        // For a broadcast command, wipe the periodic speed commands
-//                        remove_all_speed_commands();
-//                    }
-//                    else
-//                    {
-//                        // We only neeed to wipe the command of the affected address
-//                        index = index_for_periodic_speed_command(address_type, address);
-//                        if (index != SPEED_COMMAND_ARRAY_SIZE)
-//                        {
-//                            // We are safe to wipe a vacant location, if that is what was returned
-//                            speed_command_array[index].occupied = false;
-//                            speed_command_array_temp[index].occupied = false;
-//                            speed_command_address_type[index] = ADDRESS_TYPE_INVALID;
-//                        }
-//                    }
-//                }
-//                else if (((command_byte == 0x3F) && ((data_byte & 0x7E) != 0)) || (((command_byte & 0xC0) == 0x40) && ((command_byte & 0x0E) != 0)))
-//                {
-//                    // We have a 128 step speed command or a 28 step speed command which is a speed command
-//                    // Note we do this for all address types, including broadcast; the logic here is if someone is silly enough to do a broadcast speed command, it should still be periodicallly repeated
-//                    index = index_for_periodic_speed_command(address_type, address);
-//                    if (index != SPEED_COMMAND_ARRAY_SIZE)
-//                    {
-//                        // We are safe to add/overwrite
-//                        speed_command_address_type[index] = address_type;
-//                        speed_command_address[index] = address;
-//                        speed_command_array[index].occupied = false;
-//                        speed_command_array_temp[index].occupied = false;
-//                        memcpy(&speed_command_array[index], &speed_command, sizeof(dcc_command_t));
-//                        memcpy(&speed_command_array_temp[index], &speed_command, sizeof(dcc_command_t));
-//                        speed_command_array[index].occupied = true;
-//                        speed_command_array_temp[index].occupied = true;
-//                    }
-//                    else
-//                    {
-//                        // There was not enough room in the array, raise an error
-//                        disable_DCC(ERROR_CODE_MAX_TRAIN_EXCEEDED);
-//                    }
-//                }
-//            }
-//        }
-//    }
-//    else
-//    {
-//        APP_ERROR_CHECK(NRF_ERROR_INVALID_LENGTH);
-//    }
-//}
+void enqueue_dcc_command_from_scheduler (void *p_event_data, uint16_t event_size)
+{
+    uint8_t i;
+    uint16_t address = 0;
+    uint8_t address_type = ADDRESS_TYPE_INVALID;
+    uint8_t command_byte, data_byte;
+    uint8_t index;
+    dcc_command_t speed_command;
+    scheduled_dcc_command_t *p_scheduled_dcc_command;
+    
+    if (event_size == sizeof(scheduled_dcc_command_t))
+    {
+        p_scheduled_dcc_command = (scheduled_dcc_command_t *)p_event_data;
+        
+        // We send the command first to get a copy of the enqueued packet for the periodic speed command. We think we can do this because we assume this function will purge the periodic speed command array before the sent command (and its repetitions) makes it out on the rails, so if a stop is sent, the previous periodic speed command for that address will be purged before the DCC timer handler gets around to pulling it from the periodic speed command array after it clears the DCC buffer.
+        
+        // Repeat the command as required
+        for (i = 0; i < COMMAND_REPEATS; i++)
+        {
+            enqueue_dcc_command(p_scheduled_dcc_command->byte1, p_scheduled_dcc_command->byte2, p_scheduled_dcc_command->byte3, p_scheduled_dcc_command->byte4, p_scheduled_dcc_command->byte5, p_scheduled_dcc_command->len, p_scheduled_dcc_command->feedback, &speed_command);
+        }
+        
+        // If we have a reset or hard reset packet in operations mode sent to broadcast, short, or long addresses, queue up 10 idle packets to ensure the decoders don't enter service mode unintentionally
+        if (((p_scheduled_dcc_command->byte1 <= 127) && ((p_scheduled_dcc_command->byte2 == 0x00) || (p_scheduled_dcc_command->byte2 == 0x01))) ||
+            ((p_scheduled_dcc_command->byte1 >= 192) && (p_scheduled_dcc_command->byte1 <= 231) && ((p_scheduled_dcc_command->byte3 == 0x00) || (p_scheduled_dcc_command->byte3 == 0x01))))
+        {
+            for (i = 0; i < 10; i++)
+            {
+                enqueue_dcc_command(0xFF, 0, 0, 0, 0, 2, 0, NULL);
+            }
+        }
+        
+        // Only update the periodic speed commands when we are in main track mode
+        if (programming_track_mode == MAIN)
+        {
+            // First identify the address (if valid)
+            if (p_scheduled_dcc_command->byte1 == 0)
+            {
+                address_type = ADDRESS_TYPE_BROADCAST;
+                address = p_scheduled_dcc_command->byte1;
+                command_byte = p_scheduled_dcc_command->byte2;
+                data_byte = p_scheduled_dcc_command->byte3;
+            }
+            else if ((p_scheduled_dcc_command->byte1 >= 1) && (p_scheduled_dcc_command->byte1 <= 127))
+            {
+                address_type = ADDRESS_TYPE_SHORT_CONSIST;
+                address = p_scheduled_dcc_command->byte1;
+                command_byte = p_scheduled_dcc_command->byte2;
+                data_byte = p_scheduled_dcc_command->byte3;
+            }
+            else if ((p_scheduled_dcc_command->byte1 >= 192) && (p_scheduled_dcc_command->byte1 <= 231))
+            {
+                address_type = ADDRESS_TYPE_LONG;
+                address = ((p_scheduled_dcc_command->byte1 & 0x3F) << 8) | p_scheduled_dcc_command->byte2;
+                command_byte = p_scheduled_dcc_command->byte3;
+                data_byte = p_scheduled_dcc_command->byte4;
+            }
+            
+            // Now check if we have a speed command
+            if (address_type != ADDRESS_TYPE_INVALID)
+            {
+                if (((command_byte == 0x3F) && ((data_byte & 0x7E) == 0)) || (((command_byte & 0xC0) == 0x40) && ((command_byte & 0x0E) == 0)))
+                {
+                    // We have a 128 step speed command or a 28 step speed command which is a stop or emergency stop
+                    if (address_type == ADDRESS_TYPE_BROADCAST)
+                    {
+                        // For a broadcast command, wipe the periodic speed commands
+                        remove_all_speed_commands();
+                    }
+                    else
+                    {
+                        // We only neeed to wipe the command of the affected address
+                        index = index_for_periodic_speed_command(address_type, address);
+                        if (index != SPEED_COMMAND_ARRAY_SIZE)
+                        {
+                            // We are safe to wipe a vacant location, if that is what was returned
+                            speed_command_array[index].occupied = false;
+                            speed_command_array_temp[index].occupied = false;
+                            speed_command_address_type[index] = ADDRESS_TYPE_INVALID;
+                        }
+                    }
+                }
+                else if (((command_byte == 0x3F) && ((data_byte & 0x7E) != 0)) || (((command_byte & 0xC0) == 0x40) && ((command_byte & 0x0E) != 0)))
+                {
+                    // We have a 128 step speed command or a 28 step speed command which is a speed command
+                    // Note we do this for all address types, including broadcast; the logic here is if someone is silly enough to do a broadcast speed command, it should still be periodicallly repeated
+                    index = index_for_periodic_speed_command(address_type, address);
+                    if (index != SPEED_COMMAND_ARRAY_SIZE)
+                    {
+                        // We are safe to add/overwrite
+                        speed_command_address_type[index] = address_type;
+                        speed_command_address[index] = address;
+                        speed_command_array[index].occupied = false;
+                        speed_command_array_temp[index].occupied = false;
+                        memcpy(&speed_command_array[index], &speed_command, sizeof(dcc_command_t));
+                        memcpy(&speed_command_array_temp[index], &speed_command, sizeof(dcc_command_t));
+                        speed_command_array[index].occupied = true;
+                        speed_command_array_temp[index].occupied = true;
+                    }
+                    else
+                    {
+                        // There was not enough room in the array, raise an error
+                        disable_DCC(ERROR_CODE_MAX_TRAIN_EXCEEDED);
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        APP_ERROR_CHECK(NRF_ERROR_INVALID_LENGTH);
+    }
+}
 
 
 /**@brief Function for handling a write to the DCC Command characteristic.
@@ -631,24 +631,23 @@ static void dcc_command_write_handler(ble_bluetrack_t * p_bluetrack, uint8_t byt
 {
     NRF_LOG_INFO("DCC Command Written");
 
-//    scheduled_dcc_command_t scheduled_dcc_command;
-//    uint32_t err_code;
-//    UNUSED_VARIABLE(p_bluetrack);
-//    
-//    // Only schedule the enqueue of the command if we have no service command pending or in progress
-//    if (!service_command_pending && !service_command_in_progress)
-//    {
-//        scheduled_dcc_command.byte1 = byte1;
-//        scheduled_dcc_command.byte2 = byte2;
-//        scheduled_dcc_command.byte3 = byte3;
-//        scheduled_dcc_command.byte4 = byte4;
-//        scheduled_dcc_command.byte5 = byte5;
-//        scheduled_dcc_command.len = len;
-//        scheduled_dcc_command.feedback = 0;
-//        
-//        err_code = app_sched_event_put(&scheduled_dcc_command, sizeof(scheduled_dcc_command_t), enqueue_dcc_command_from_scheduler);
-//        APP_ERROR_CHECK(err_code);
-//    }
+    scheduled_dcc_command_t scheduled_dcc_command;
+    uint32_t err_code;
+    
+    // Only schedule the enqueue of the command if we have no service command pending or in progress
+    if (!service_command_pending && !service_command_in_progress)
+    {
+        scheduled_dcc_command.byte1 = byte1;
+        scheduled_dcc_command.byte2 = byte2;
+        scheduled_dcc_command.byte3 = byte3;
+        scheduled_dcc_command.byte4 = byte4;
+        scheduled_dcc_command.byte5 = byte5;
+        scheduled_dcc_command.len = len;
+        scheduled_dcc_command.feedback = 0;
+        
+        err_code = app_sched_event_put(&scheduled_dcc_command, sizeof(scheduled_dcc_command_t), enqueue_dcc_command_from_scheduler);
+        APP_ERROR_CHECK(err_code);
+    }
 }
 
 
@@ -705,7 +704,7 @@ static void stop_write_handler(ble_bluetrack_t * p_bluetrack, uint8_t stop)
     uint32_t err_code;
 
     // First clear all periodic speed commands
-//    remove_all_speed_commands();
+    remove_all_speed_commands();
  
     if (stop)
     {
@@ -752,29 +751,28 @@ static void service_command_write_handler(ble_bluetrack_t * p_bluetrack, uint8_t
 {
     NRF_LOG_INFO("Service Command Written");
 
-//    UNUSED_VARIABLE(p_bluetrack);
-//    if (!service_command_pending && !service_command_in_progress)
-//    {
-//        // Initialise counters and values
-//        read_byte_counter = 0;
-//        read_bit_counter = 0;
-//        read_bit_value = 0;
-//        
-//        // Store command parameters
-//        function = function_local;
-//        mode = mode_local;
-//        CV_or_reg_upper = CV_or_reg_upper_local;
-//        CV_or_reg_lower = CV_or_reg_lower_local;
-//        value = value_local;
-//        
-//        // Raise pending flag only if parameters are valid
-//        if ((function == FUNCTION_READ_BIT || function == FUNCTION_READ_BYTE || function == FUNCTION_WRITE_BIT || function == FUNCTION_WRITE_BYTE) &&
-//            (mode == MODE_DIRECT || mode == MODE_ADDRESS || mode == MODE_PAGED || mode == MODE_REGISTER) &&
-//            ((function != FUNCTION_READ_BIT && function != FUNCTION_WRITE_BIT) || ((function == FUNCTION_READ_BIT || function == FUNCTION_WRITE_BIT) && (mode == MODE_DIRECT))))
-//        {
-//            service_command_pending = true;
-//        }
-//    }
+    if (!service_command_pending && !service_command_in_progress)
+    {
+        // Initialise counters and values
+        read_byte_counter = 0;
+        read_bit_counter = 0;
+        read_bit_value = 0;
+        
+        // Store command parameters
+        function = function_local;
+        mode = mode_local;
+        CV_or_reg_upper = CV_or_reg_upper_local;
+        CV_or_reg_lower = CV_or_reg_lower_local;
+        value = value_local;
+        
+        // Raise pending flag only if parameters are valid
+        if ((function == FUNCTION_READ_BIT || function == FUNCTION_READ_BYTE || function == FUNCTION_WRITE_BIT || function == FUNCTION_WRITE_BYTE) &&
+            (mode == MODE_DIRECT || mode == MODE_ADDRESS || mode == MODE_PAGED || mode == MODE_REGISTER) &&
+            ((function != FUNCTION_READ_BIT && function != FUNCTION_WRITE_BIT) || ((function == FUNCTION_READ_BIT || function == FUNCTION_WRITE_BIT) && (mode == MODE_DIRECT))))
+        {
+            service_command_pending = true;
+        }
+    }
 }
 
 
@@ -786,410 +784,403 @@ static void service_command_write_handler(ble_bluetrack_t * p_bluetrack, uint8_t
  * @param[in]   p_event_data   Undefined pointer.
  * @param[in]   event_size     Size of 0.
  */
-//void execute_service_command (void *p_event_data, uint16_t event_size)
-//{
-//    uint8_t byte1;
-//    uint8_t byte2;
-//    uint8_t byte3;
-//
-//    uint8_t i;
-//
-//    uint8_t page;
-//    uint8_t data_register;
-//    
-//    uint16_t CV_or_reg = ( ((uint16_t)CV_or_reg_lower) | 
-//                 ( ((uint16_t)CV_or_reg_upper) << 8 ) );
-//#ifdef DEBUG
-//    uint32_t err_code;
-//#endif
-//    if (event_size == 0)
-//    {
-//        // As per S-9.2.3, we should guarantee a power on cycle by queueing 20 idle packets
-//        for (i = 0; i < 20; i++)
-//        {
-//            enqueue_dcc_command(0xFF, 0, 0, 0, 0, 2, 0, NULL);
-//        }
-//        
-//        if (function == FUNCTION_WRITE_BYTE)
-//        {
-//            if (mode == MODE_DIRECT)
-//            {
-//                // TOTAL 14
-//                // 3 reset packets
-//                for (i = 0; i < 3; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // We are sending a CV address, so only extract the lower two bits from the upper byte
-//                byte1 = 0x7C | (CV_or_reg_upper & 0x03);
-//                byte2 = CV_or_reg_lower;
-//                byte3 = value;
-//                
-//                // 5 write packets
-//                enqueue_dcc_command(byte1, byte2, byte3, 0, 0, 3, 1, NULL);
-//                for (i = 0; i < 4; i++)
-//                {
-//                    enqueue_dcc_command(byte1, byte2, byte3, 0, 0, 3, 0, NULL);
-//                }
-//                
-//                // 6 reset packets
-//                for (i = 0; i < 6; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//            }
-//            else if (mode == MODE_ADDRESS)
-//            {
-//                // TOTAL 32
-//                // 3 reset packets
-//                for (i = 0; i < 3; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // 5 page preset packets
-//                for (i = 0; i < 5; i++)
-//                {
-//                    enqueue_dcc_command(0x7D, 0x01, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // 6 reset packets
-//                for (i = 0; i < 6; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // 3 reset packets
-//                for (i = 0; i < 3; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                byte1 = 0x78;
-//                // Ensure the address to be written is <= 127 (S-9.2.2 CV 1)
-//                byte2 = value & 0x7F;
-//                
-//                // 5 write packets
-//                enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 1, NULL);
-//                for (i = 0; i < 4; i++)
-//                {
-//                    enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // 10 reset packets
-//                for (i = 0; i < 10; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//            }
-//            else if (mode == MODE_REGISTER)
-//            {
-//                // TOTAL 32
-//                // 3 reset packets
-//                for (i = 0; i < 3; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // 5 page preset packets
-//                for (i = 0; i < 5; i++)
-//                {
-//                    enqueue_dcc_command(0x7D, 0x01, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // 6 reset packets
-//                for (i = 0; i < 6; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // 3 reset packets
-//                for (i = 0; i < 3; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // For a register address, extract only the lower three bits from the lower byte
-//                byte1 = 0x78 | (CV_or_reg_lower & 0x07);
-//                byte2 = value;
-//                
-//                // 5 write packets
-//                enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 1, NULL);
-//                for (i = 0; i < 4; i++)
-//                {
-//                    enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // 10 reset packets
-//                for (i = 0; i < 10; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//            }
-//            else if (mode == MODE_PAGED)
-//            {
-//                // TOTAL 28
-//                // 3 reset packets
-//                for (i = 0; i < 3; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // Ensure CV is < 1024 before converting to page number
-//                page = ((CV_or_reg & 0x03FF) / 4) + 1;
-//                
-//                // 5 page preset packets
-//                for (i = 0; i < 5; i++)
-//                {
-//                    enqueue_dcc_command(0x7D, page, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // 6 reset packets
-//                for (i = 0; i < 6; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // 3 reset packets
-//                for (i = 0; i < 3; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // Ensure CV is < 1024 before converting to register number
-//                data_register = (CV_or_reg & 0x03FF) % 4;
-//                byte1 = 0x78 | data_register;
-//                byte2 = value;
-//                
-//                // 5 write packets
-//                enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 1, NULL);
-//                for (i = 0; i < 4; i++)
-//                {
-//                    enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // 6 reset packets
-//                for (i = 0; i < 6; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//            }
-//        }
-//        else if (function == FUNCTION_READ_BYTE)
-//        {
-//            if (mode == MODE_DIRECT)
-//            {
-//                // TOTAL 9
-//                // 3 reset packets
-//                for (i = 0; i < 3; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // We are sending a CV address, so only extract the lower two bits from the upper byte
-//                byte1 = 0x74 | (CV_or_reg_upper & 0x03);
-//                byte2 = CV_or_reg_lower;
-//                byte3 = read_byte_counter;
-//                
-//                // 5 read packets
-//                enqueue_dcc_command(byte1, byte2, byte3, 0, 0, 3, 1, NULL);
-//                for (i = 0; i < 4; i++)
-//                {
-//                    enqueue_dcc_command(byte1, byte2, byte3, 0, 0, 3, 0, NULL);
-//                }
-//                
-//                // 1 reset packet
-//                enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//            }
-//            else if (mode == MODE_ADDRESS)
-//            {
-//                // TOTAL 21
-//                // 3 reset packets
-//                for (i = 0; i < 3; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // 5 page preset packets
-//                for (i = 0; i < 5; i++)
-//                {
-//                    enqueue_dcc_command(0x7D, 0x01, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // 5 reset packets
-//                for (i = 0; i < 5; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // 3 reset packets
-//                for (i = 0; i < 3; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                byte1 = 0x70;
-//                // Ensure the address to be written is <= 127
-//                byte2 = read_byte_counter & 0x7F;
-//                
-//                // 5 read packets
-//                enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 1, NULL);
-//                for (i = 0; i < 4; i++)
-//                {
-//                    enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 0, NULL);
-//                }
-//            }
-//            else if (mode == MODE_REGISTER)
-//            {
-//                // TOTAL 24
-//                // 3 reset packets
-//                for (i = 0; i < 3; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // 5 page preset packets
-//                for (i = 0; i < 5; i++)
-//                {
-//                    enqueue_dcc_command(0x7D, 0x01, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // 6 reset packets
-//                for (i = 0; i < 6; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // 3 reset packets
-//                for (i = 0; i < 3; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // For a register address, extract only the lower three bits from the lower byte
-//                byte1 = 0x70 | (CV_or_reg_lower & 0x07);
-//                byte2 = read_byte_counter;
-//                
-//                // 7 read packets
-//                enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 1, NULL);
-//                for (i = 0; i < 7; i++)
-//                {
-//                    enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 0, NULL);
-//                }
-//            }
-//            else if (mode == MODE_PAGED)
-//            {
-//                // TOTAL 22
-//                // 3 reset packets
-//                for (i = 0; i < 3; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // Ensure CV is < 1024 before converting to page number
-//                page = ((CV_or_reg & 0x03FF) / 4) + 1;
-//                
-//                // 5 page preset packets
-//                for (i = 0; i < 5; i++)
-//                {
-//                    enqueue_dcc_command(0x7D, page, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // 6 reset packets
-//                for (i = 0; i < 6; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // 3 reset packets
-//                for (i = 0; i < 3; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // Ensure CV is < 1024 before converting to register number
-//                data_register = (CV_or_reg & 0x03FF) % 4;
-//                byte1 = 0x70 | data_register;
-//                byte2 = value;
-//                
-//                // 5 read packets
-//                enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 1, NULL);
-//                for (i = 0; i < 4; i++)
-//                {
-//                    enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 0, NULL);
-//                }
-//            }
-//        }
-//        else if (function == FUNCTION_WRITE_BIT)
-//        {
-//            if (mode == MODE_DIRECT)
-//            {
-//                // TOTAL 14
-//                // 3 reset packets
-//                for (i = 0; i < 3; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // We are sending a CV address, so only extract the lower two bits from the upper byte
-//                byte1 = 0x78 | (CV_or_reg_upper & 0x03);
-//                byte2 = CV_or_reg_lower;
-//                // The lower 4 bits of value are the bit value to be written (bit 3) and the bit position (bits 2-0)
-//                byte3 = 0xF0 | (value & 0x0F);
-//                
-//                // 5 write packets
-//                enqueue_dcc_command(byte1, byte2, byte3, 0, 0, 3, 1, NULL);
-//                for (i = 0; i < 4; i++)
-//                {
-//                    enqueue_dcc_command(byte1, byte2, byte3, 0, 0, 3, 0, NULL);
-//                }
-//                
-//                // 6 reset packets
-//                for (i = 0; i < 6; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//            }
-//        }
-//        else if (function == FUNCTION_READ_BIT)
-//        {
-//            if (mode == MODE_DIRECT)
-//            {
-//                // TOTAL 9
-//                // 3 reset packets
-//                for (i = 0; i < 3; i++)
-//                {
-//                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//                }
-//                
-//                // We are sending a CV address, so only extract the lower two bits from the upper byte
-//                byte1 = 0x78 | (CV_or_reg_upper & 0x03);
-//                byte2 = CV_or_reg_lower;
-//                // read_bit_counter is the bit position
-//                byte3 = 0xE8 | (read_bit_counter & 0x07);
-//                
-//                // 5 read packets
-//                enqueue_dcc_command(byte1, byte2, byte3, 0, 0, 3, 1, NULL);
-//                for (i = 0; i < 4; i++)
-//                {
-//                    enqueue_dcc_command(byte1, byte2, byte3, 0, 0, 3, 0, NULL);
-//                }
-//                
-//                // 1 reset packet
-//                enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
-//            }
-//        }
-//#ifdef DEBUG
-//        err_code = app_uart_put_string("Service command enqueued\n\r");
-//        APP_ERROR_CHECK(err_code);
-//#endif
-//    }
-//    else
-//    {
-//        APP_ERROR_CHECK(NRF_ERROR_INVALID_LENGTH);
-//    }
-//}
+void execute_service_command (void *p_event_data, uint16_t event_size)
+{
+    uint8_t byte1;
+    uint8_t byte2;
+    uint8_t byte3;
+
+    uint8_t i;
+
+    uint8_t page;
+    uint8_t data_register;
+    
+    uint16_t CV_or_reg = ( ((uint16_t)CV_or_reg_lower) | 
+                 ( ((uint16_t)CV_or_reg_upper) << 8 ) );
+    if (event_size == 0)
+    {
+        // As per S-9.2.3, we should guarantee a power on cycle by queueing 20 idle packets
+        for (i = 0; i < 20; i++)
+        {
+            enqueue_dcc_command(0xFF, 0, 0, 0, 0, 2, 0, NULL);
+        }
+        
+        if (function == FUNCTION_WRITE_BYTE)
+        {
+            if (mode == MODE_DIRECT)
+            {
+                // TOTAL 14
+                // 3 reset packets
+                for (i = 0; i < 3; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // We are sending a CV address, so only extract the lower two bits from the upper byte
+                byte1 = 0x7C | (CV_or_reg_upper & 0x03);
+                byte2 = CV_or_reg_lower;
+                byte3 = value;
+                
+                // 5 write packets
+                enqueue_dcc_command(byte1, byte2, byte3, 0, 0, 3, 1, NULL);
+                for (i = 0; i < 4; i++)
+                {
+                    enqueue_dcc_command(byte1, byte2, byte3, 0, 0, 3, 0, NULL);
+                }
+                
+                // 6 reset packets
+                for (i = 0; i < 6; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+            }
+            else if (mode == MODE_ADDRESS)
+            {
+                // TOTAL 32
+                // 3 reset packets
+                for (i = 0; i < 3; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // 5 page preset packets
+                for (i = 0; i < 5; i++)
+                {
+                    enqueue_dcc_command(0x7D, 0x01, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // 6 reset packets
+                for (i = 0; i < 6; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // 3 reset packets
+                for (i = 0; i < 3; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                byte1 = 0x78;
+                // Ensure the address to be written is <= 127 (S-9.2.2 CV 1)
+                byte2 = value & 0x7F;
+                
+                // 5 write packets
+                enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 1, NULL);
+                for (i = 0; i < 4; i++)
+                {
+                    enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // 10 reset packets
+                for (i = 0; i < 10; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+            }
+            else if (mode == MODE_REGISTER)
+            {
+                // TOTAL 32
+                // 3 reset packets
+                for (i = 0; i < 3; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // 5 page preset packets
+                for (i = 0; i < 5; i++)
+                {
+                    enqueue_dcc_command(0x7D, 0x01, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // 6 reset packets
+                for (i = 0; i < 6; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // 3 reset packets
+                for (i = 0; i < 3; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // For a register address, extract only the lower three bits from the lower byte
+                byte1 = 0x78 | (CV_or_reg_lower & 0x07);
+                byte2 = value;
+                
+                // 5 write packets
+                enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 1, NULL);
+                for (i = 0; i < 4; i++)
+                {
+                    enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // 10 reset packets
+                for (i = 0; i < 10; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+            }
+            else if (mode == MODE_PAGED)
+            {
+                // TOTAL 28
+                // 3 reset packets
+                for (i = 0; i < 3; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // Ensure CV is < 1024 before converting to page number
+                page = ((CV_or_reg & 0x03FF) / 4) + 1;
+                
+                // 5 page preset packets
+                for (i = 0; i < 5; i++)
+                {
+                    enqueue_dcc_command(0x7D, page, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // 6 reset packets
+                for (i = 0; i < 6; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // 3 reset packets
+                for (i = 0; i < 3; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // Ensure CV is < 1024 before converting to register number
+                data_register = (CV_or_reg & 0x03FF) % 4;
+                byte1 = 0x78 | data_register;
+                byte2 = value;
+                
+                // 5 write packets
+                enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 1, NULL);
+                for (i = 0; i < 4; i++)
+                {
+                    enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // 6 reset packets
+                for (i = 0; i < 6; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+            }
+        }
+        else if (function == FUNCTION_READ_BYTE)
+        {
+            if (mode == MODE_DIRECT)
+            {
+                // TOTAL 9
+                // 3 reset packets
+                for (i = 0; i < 3; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // We are sending a CV address, so only extract the lower two bits from the upper byte
+                byte1 = 0x74 | (CV_or_reg_upper & 0x03);
+                byte2 = CV_or_reg_lower;
+                byte3 = read_byte_counter;
+                
+                // 5 read packets
+                enqueue_dcc_command(byte1, byte2, byte3, 0, 0, 3, 1, NULL);
+                for (i = 0; i < 4; i++)
+                {
+                    enqueue_dcc_command(byte1, byte2, byte3, 0, 0, 3, 0, NULL);
+                }
+                
+                // 1 reset packet
+                enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+            }
+            else if (mode == MODE_ADDRESS)
+            {
+                // TOTAL 21
+                // 3 reset packets
+                for (i = 0; i < 3; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // 5 page preset packets
+                for (i = 0; i < 5; i++)
+                {
+                    enqueue_dcc_command(0x7D, 0x01, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // 5 reset packets
+                for (i = 0; i < 5; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // 3 reset packets
+                for (i = 0; i < 3; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                byte1 = 0x70;
+                // Ensure the address to be written is <= 127
+                byte2 = read_byte_counter & 0x7F;
+                
+                // 5 read packets
+                enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 1, NULL);
+                for (i = 0; i < 4; i++)
+                {
+                    enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 0, NULL);
+                }
+            }
+            else if (mode == MODE_REGISTER)
+            {
+                // TOTAL 24
+                // 3 reset packets
+                for (i = 0; i < 3; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // 5 page preset packets
+                for (i = 0; i < 5; i++)
+                {
+                    enqueue_dcc_command(0x7D, 0x01, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // 6 reset packets
+                for (i = 0; i < 6; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // 3 reset packets
+                for (i = 0; i < 3; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // For a register address, extract only the lower three bits from the lower byte
+                byte1 = 0x70 | (CV_or_reg_lower & 0x07);
+                byte2 = read_byte_counter;
+                
+                // 7 read packets
+                enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 1, NULL);
+                for (i = 0; i < 7; i++)
+                {
+                    enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 0, NULL);
+                }
+            }
+            else if (mode == MODE_PAGED)
+            {
+                // TOTAL 22
+                // 3 reset packets
+                for (i = 0; i < 3; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // Ensure CV is < 1024 before converting to page number
+                page = ((CV_or_reg & 0x03FF) / 4) + 1;
+                
+                // 5 page preset packets
+                for (i = 0; i < 5; i++)
+                {
+                    enqueue_dcc_command(0x7D, page, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // 6 reset packets
+                for (i = 0; i < 6; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // 3 reset packets
+                for (i = 0; i < 3; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // Ensure CV is < 1024 before converting to register number
+                data_register = (CV_or_reg & 0x03FF) % 4;
+                byte1 = 0x70 | data_register;
+                byte2 = value;
+                
+                // 5 read packets
+                enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 1, NULL);
+                for (i = 0; i < 4; i++)
+                {
+                    enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 0, NULL);
+                }
+            }
+        }
+        else if (function == FUNCTION_WRITE_BIT)
+        {
+            if (mode == MODE_DIRECT)
+            {
+                // TOTAL 14
+                // 3 reset packets
+                for (i = 0; i < 3; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // We are sending a CV address, so only extract the lower two bits from the upper byte
+                byte1 = 0x78 | (CV_or_reg_upper & 0x03);
+                byte2 = CV_or_reg_lower;
+                // The lower 4 bits of value are the bit value to be written (bit 3) and the bit position (bits 2-0)
+                byte3 = 0xF0 | (value & 0x0F);
+                
+                // 5 write packets
+                enqueue_dcc_command(byte1, byte2, byte3, 0, 0, 3, 1, NULL);
+                for (i = 0; i < 4; i++)
+                {
+                    enqueue_dcc_command(byte1, byte2, byte3, 0, 0, 3, 0, NULL);
+                }
+                
+                // 6 reset packets
+                for (i = 0; i < 6; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+            }
+        }
+        else if (function == FUNCTION_READ_BIT)
+        {
+            if (mode == MODE_DIRECT)
+            {
+                // TOTAL 9
+                // 3 reset packets
+                for (i = 0; i < 3; i++)
+                {
+                    enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+                }
+                
+                // We are sending a CV address, so only extract the lower two bits from the upper byte
+                byte1 = 0x78 | (CV_or_reg_upper & 0x03);
+                byte2 = CV_or_reg_lower;
+                // read_bit_counter is the bit position
+                byte3 = 0xE8 | (read_bit_counter & 0x07);
+                
+                // 5 read packets
+                enqueue_dcc_command(byte1, byte2, byte3, 0, 0, 3, 1, NULL);
+                for (i = 0; i < 4; i++)
+                {
+                    enqueue_dcc_command(byte1, byte2, byte3, 0, 0, 3, 0, NULL);
+                }
+                
+                // 1 reset packet
+                enqueue_dcc_command(0, 0, 0, 0, 0, 2, 0, NULL);
+            }
+        }
+    }
+    else
+    {
+        APP_ERROR_CHECK(NRF_ERROR_INVALID_LENGTH);
+    }
+}
 
 
 /**@brief Function for handling the THERMAL_N signal going high to low.
@@ -1551,8 +1542,8 @@ void timer_dcc_data_event_handler(nrf_timer_event_t event_type, void* p_context)
  * @details Feedback application timer runs continuously every feedback window until the DCC buffer is empty. Every time it completes, it triggers
  * another ADC sample, or terminates the feedback window and, if required, the service command.
  */
-//static void feedback_timer_timeout_handler(void *p_context)
-//{
+static void feedback_timer_timeout_handler(void *p_context)
+{
 //    uint32_t err_code;
 //
 //    UNUSED_VARIABLE(p_context);
@@ -1630,7 +1621,7 @@ void timer_dcc_data_event_handler(nrf_timer_event_t event_type, void* p_context)
 //        // Lower feedback flag
 //        feedback_in_progress = false;
 //    }
-//}
+}
 
 
 /**@brief Function for handling the output application timer expiry.
@@ -1783,8 +1774,8 @@ static void timers_init(void)
     err_code = app_timer_create(&output_timer, APP_TIMER_MODE_SINGLE_SHOT, output_timer_timeout_handler);
     APP_ERROR_CHECK(err_code);
     // Create feedback application timer
-    //err_code = app_timer_create(&feedback_timer, APP_TIMER_MODE_SINGLE_SHOT, feedback_timer_timeout_handler);
-    //APP_ERROR_CHECK(err_code);
+    err_code = app_timer_create(&feedback_timer, APP_TIMER_MODE_SINGLE_SHOT, feedback_timer_timeout_handler);
+    APP_ERROR_CHECK(err_code);
 }
 
 
@@ -1915,39 +1906,34 @@ static void bluetrack_init(void)
     }
 
     // Clear buffer
-    //memset(dcc_command_buffer, 0, sizeof(dcc_command_buffer));
+    memset(dcc_command_buffer, 0, sizeof(dcc_command_buffer));
     
+    // We start with no pending speed commands
+    remove_all_speed_commands();
+    active_speed_command_index = 0;
+
     // Clear idle memory
-    //memset(&idle_packet, 0, sizeof(idle_packet));
+    memset(&idle_packet, 0, sizeof(idle_packet));
 
     // Set indexes and phases
-    //producer_index = 0;
-    //consumer_index = 0;
-    //phase1_complete = true;
-    //phase2_complete = false;
-
-    // We start with no pending speed commands
-    //remove_all_speed_commands();
-    //active_speed_command_index = 0;
-    
-    // Send ones at the start
-    //dcc_output_state = true;
+    producer_index = 0;
+    consumer_index = 0;
+    phase1_complete = true;
+    phase2_complete = false;
 
     // We start off with DCC enabled
     dcc_disabled = false;
 
     // We start of with feedback not in progress
-    //feedback_in_progress = false;
+    feedback_in_progress = false;
 
     // We start off with the main track selected
     programming_track_mode = MAIN;
-    //programming_track_state = MAIN;
+    programming_track_state = MAIN;
     
-    // We start off with no service command pending
-    //service_command_pending = false;
-    
-    // We start off with no service command in progress
-    //service_command_in_progress = false;
+    // We start off with no service command pending or in progress
+    service_command_pending = false;
+    service_command_in_progress = false;
 
     // We do not send 20 reset packets and 10 idle packets, as suggested by S-9.2.4
 }
@@ -2254,8 +2240,8 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
             
             m_conn_handle = BLE_CONN_HANDLE_INVALID;
 
-//            // Remove all pending periodic speed commands
-//            remove_all_speed_commands();
+            // Remove all pending periodic speed commands
+            remove_all_speed_commands();
             
             // Reset programming track selection and characteristic
             programming_track_mode = MAIN;
