@@ -2222,14 +2222,11 @@ static void advertising_start(void)
 static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 {
     ret_code_t                       err_code;
-    ble_gatts_evt_write_t const * p_evt_write;
-    uint8_t const * data;
-//    static ble_gap_evt_auth_status_t m_auth_status;
-//    ble_gap_enc_info_t *             p_enc_info;
-//    uint16_t                         m_programming_track_select_len = PROGRAMMING_TRACK_SELECT_CHAR_SIZE;
-//    uint8_t                          m_programming_track_select_value = 0x00;
-//    uint16_t                         m_stop_len = STOP_CHAR_SIZE;
-//    uint8_t                          m_stop_value = 0x01;
+    ble_gatts_evt_write_t const *    p_evt_write;
+    uint8_t const *                  data;
+    ble_gatts_value_t                value;
+    uint8_t                          m_programming_track_select_value = 0x00;
+    uint8_t                          m_stop_value = 0x01;
 
     switch (p_ble_evt->header.evt_id)
     {
@@ -2260,16 +2257,23 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 //            // Remove all pending periodic speed commands
 //            remove_all_speed_commands();
             
-//            // Reset programming track selection and characteristic
-//            programming_track_mode = MAIN;
-//            err_code = sd_ble_gatts_value_set(m_bluetrack.programming_track_select_char_handles.value_handle, 0, &m_programming_track_select_len, &m_programming_track_select_value);
-//            APP_ERROR_CHECK(err_code);
+            // Reset programming track selection and characteristic
+            programming_track_mode = MAIN;
+            nrf_drv_gpiote_out_clear(PROG_LED_PIN_NO);
+            value.len = PROGRAMMING_TRACK_SELECT_CHAR_SIZE;
+            value.offset = 0;
+            value.p_value = &m_programming_track_select_value;
+            err_code = sd_ble_gatts_value_set(m_conn_handle, m_bluetrack.programming_track_select_char_handles.value_handle, &value);
+            APP_ERROR_CHECK(err_code);
 
-//            // Reset stop selection and characteristic
-//            nrf_gpio_pin_clear(BRAKE_PIN_NO);
-//            nrf_gpio_pin_set(STOP_LED_PIN_NO);
-//            err_code = sd_ble_gatts_value_set(m_bluetrack.stop_char_handles.value_handle, 0, &m_stop_len, &m_stop_value);
-//            APP_ERROR_CHECK(err_code);
+            // Reset stop selection and characteristic
+            nrf_drv_gpiote_out_clear(BRAKE_N_PIN_NO);
+            nrf_drv_gpiote_out_set(STOP_LED_PIN_NO);
+            value.len = STOP_CHAR_SIZE;
+            value.offset = 0;
+            value.p_value = &m_stop_value;
+            err_code = sd_ble_gatts_value_set(m_conn_handle, m_bluetrack.stop_char_handles.value_handle, &value);
+            APP_ERROR_CHECK(err_code);
 
             // Restart advertising
             advertising_start();
@@ -2318,13 +2322,13 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
             break;
 
         case BLE_GATTS_EVT_WRITE:
-
+            // Check if the Service Changed CCCD has been written to
             p_evt_write = &p_ble_evt->evt.gatts_evt.params.write;
             data = p_evt_write->data;
             // Empirically, Service Changed CCCD has handle 0xD, and is always Indicated (value is 0x2)
             // Note data is little endian
             if((p_evt_write->handle == 0xD) && (p_evt_write->len == 2) && (data[0] == 0x2)) {
-                NRF_LOG_INFO("Service Changed ready to Indicate");
+                NRF_LOG_INFO("Service Changed ready to indicate, indicating now");
                 err_code = gscm_service_changed_ind_send(m_conn_handle);
                 APP_ERROR_CHECK(err_code);
             }
@@ -2433,6 +2437,7 @@ int main(void)
 //    adc_init();
     bluetrack_init();
     safety_init();
+
     // Start execution
     NRF_LOG_INFO("Bluetrack started.");
     timers_start();
