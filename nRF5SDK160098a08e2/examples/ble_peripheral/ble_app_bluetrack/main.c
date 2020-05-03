@@ -158,9 +158,9 @@
 //
 //#define SPEED_COMMAND_ARRAY_SIZE        128                                         /**< Number of addresses we can store a speed command for. This places a limitation on the number of trains we can concurrently support. */
 //
-//#define MAIN                            0                                           /**< Indicates DCC commands are sent to the main track. */
-//#define PROGRAMMING                     1                                           /**< Indicates DCC commands are sent to the programming track. */
-//#define MAIN_REPEAT                     2                                           /**< Indicates repeating DCC commands are being sent to the main track in programming mode */
+#define MAIN                            0                                           /**< Indicates DCC commands are sent to the main track, used by both programming_track_state and programming_track_mode. */
+#define PROGRAMMING                     1                                           /**< Indicates DCC commands are sent to the programming track, used by both programming_track_state and programming_track_mode. */
+#define MAIN_REPEAT                     2                                           /**< Indicates repeating DCC commands are being sent to the main track in programming mode, only used by programming_track_state. */
 
 #define DEVICE_NAME                     "BlueTrack"                                /**< Name of device. Will be included in the advertising data. Limit length to 11 to allow Master Emulator to connect (unexplained). */
 
@@ -299,7 +299,7 @@ static bool                             dcc_disabled;                           
 //static bool                             acknowledge;                                          /**< Flag to indicate an acknowledge was received during feedback */
 //static bool                             service_command_pending;                              /**< Flag to indicate whether a service command is pending */
 //static bool                             service_command_in_progress;                          /**< Flag to indicate whether a service command is in progress */
-//static uint8_t                          programming_track_mode;                               /**< Variable to keep track of programming track mode */
+static uint8_t                          programming_track_mode;                               /**< Variable to keep track of programming track mode, this is the mode requested by the characteristic */
 //static uint8_t                          programming_track_state;                              /**< Variable to keep track of programming track state */
 //static uint8_t                          function;                                             /**< Function of the service command pending/in progress */
 //static uint8_t                          mode;                                                 /**< Mode of the service command pending/in progress */
@@ -652,29 +652,6 @@ static void dcc_command_write_handler(ble_bluetrack_t * p_bluetrack, uint8_t byt
 }
 
 
-/**@brief Function for notifying the programming track select characteristic.
- *
- * @details This function posts a notification to the programming track select characteristic. It is done outside the write handler as an error was observed previously in this context.
- *
- * @param[in]   p_event_data   Undefined pointer.
- * @param[in]   event_size     Size of 0.
- */
-//void programming_track_select_notify (void *p_event_data, uint16_t event_size)
-//{
-//    uint32_t err_code;
-//
-//    if (event_size == 0)
-//    {
-//        err_code = ble_bluetrack_programming_track_select_update(&m_bluetrack);
-//        APP_ERROR_CHECK(err_code);
-//    }
-//    else
-//    {
-//        APP_ERROR_CHECK(NRF_ERROR_INVALID_LENGTH);
-//    }
-//}
-
-
 /**@brief Function for handling a write to the Programming Track Select characteristic.
  *
  * @details This function enters programming mode if select is true by enabling the programming track output and indicating via LED.
@@ -685,29 +662,31 @@ static void dcc_command_write_handler(ble_bluetrack_t * p_bluetrack, uint8_t byt
  */
 static void programming_track_select_write_handler(ble_bluetrack_t * p_bluetrack, uint8_t select)
 {
-    NRF_LOG_INFO("Programming Track Select Written");
+    NRF_LOG_INFO("Programming Track Select Written, value: %d", select);
 
-//    UNUSED_VARIABLE(p_bluetrack);
-//    uint32_t err_code;
-//    
-//    if (select == MAIN)
-//    {
-//        programming_track_mode = MAIN;
-//
-//        // Indicate programming track deselection
-//        nrf_gpio_pin_clear(PROGRAMMING_LED_PIN_NO);
-//    }
-//    else
-//    {
-//        programming_track_mode = PROGRAMMING;
-//
-//        // Indicate programming track selection
-//        nrf_gpio_pin_set(PROGRAMMING_LED_PIN_NO);
-//    }
-//
-//    // Notify the client
-//    err_code = app_sched_event_put(NULL, 0, programming_track_select_notify);
-//    APP_ERROR_CHECK(err_code);
+    uint32_t err_code;
+    
+    if (select == MAIN)
+    {
+        programming_track_mode = MAIN;
+
+        // Indicate programming track deselection
+        nrf_drv_gpiote_out_clear(PROG_LED_PIN_NO);
+    }
+    else
+    {
+        programming_track_mode = PROGRAMMING;
+
+        // Indicate programming track selection
+        nrf_drv_gpiote_out_set(PROG_LED_PIN_NO);
+    }
+
+    // Notify the client
+    err_code = ble_bluetrack_programming_track_select_update(m_conn_handle, &m_bluetrack);
+    if (err_code != BLE_ERROR_INVALID_CONN_HANDLE && err_code != NRF_ERROR_INVALID_STATE)
+    {
+        APP_ERROR_CHECK(err_code);
+    }
 }
 
 
@@ -721,7 +700,7 @@ static void programming_track_select_write_handler(ble_bluetrack_t * p_bluetrack
  */
 static void stop_write_handler(ble_bluetrack_t * p_bluetrack, uint8_t stop)
 {
-    NRF_LOG_INFO("Stop Written");
+    NRF_LOG_INFO("Stop Written, value: %d", stop);
 
     uint32_t err_code;
 
@@ -1961,7 +1940,7 @@ static void bluetrack_init(void)
     //feedback_in_progress = false;
 
     // We start off with the main track selected
-    //programming_track_mode = MAIN;
+    programming_track_mode = MAIN;
     //programming_track_state = MAIN;
     
     // We start off with no service command pending
