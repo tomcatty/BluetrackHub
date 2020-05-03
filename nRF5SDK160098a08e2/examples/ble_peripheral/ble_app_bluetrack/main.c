@@ -1349,7 +1349,7 @@ void timer_dcc_data_event_handler(nrf_timer_event_t event_type, void* p_context)
             // Send data
             phase1_complete = true;
             phase2_complete = false;
-            //nrf_timer_cc_write(TIMER_DCC_DATA.p_reg, NRF_TIMER_CC_CHANNEL0, dcc_output_state ? nrf_drv_timer_us_to_ticks(&TIMER_DCC_DATA, DCC_ONE_TIME_US) : nrf_drv_timer_us_to_ticks(&TIMER_DCC_DATA, DCC_ZERO_TIME_US));
+            nrf_timer_cc_write(TIMER_DCC_DATA.p_reg, NRF_TIMER_CC_CHANNEL0, nrf_drv_timer_us_to_ticks(&TIMER_DCC_DATA, DCC_ONE_TIME_US));//dcc_output_state ? nrf_drv_timer_us_to_ticks(&TIMER_DCC_DATA, DCC_ONE_TIME_US) : nrf_drv_timer_us_to_ticks(&TIMER_DCC_DATA, DCC_ZERO_TIME_US));
 
             // Check for exhaustion and unset occupied
             if (active_packet->data2_count == 0)
@@ -1509,7 +1509,7 @@ void timer_dcc_data_event_handler(nrf_timer_event_t event_type, void* p_context)
             // Send a single one, as we have no data to send this time
             phase1_complete = true;
             phase2_complete = false;
-            //nrf_timer_cc_write(TIMER_DCC_DATA.p_reg, NRF_TIMER_CC_CHANNEL0, nrf_drv_timer_us_to_ticks(&TIMER_DCC_DATA, DCC_ONE_TIME_US));
+            nrf_timer_cc_write(TIMER_DCC_DATA.p_reg, NRF_TIMER_CC_CHANNEL0, nrf_drv_timer_us_to_ticks(&TIMER_DCC_DATA, DCC_ONE_TIME_US));
         }
     }
     else
