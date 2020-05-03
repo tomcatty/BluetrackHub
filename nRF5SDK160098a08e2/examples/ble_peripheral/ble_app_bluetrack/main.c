@@ -675,29 +675,6 @@ static void dcc_command_write_handler(ble_bluetrack_t * p_bluetrack, uint8_t byt
 //}
 
 
-/**@brief Function for notifying the stop characteristic.
- *
- * @details This function posts a notification to the stop characteristic. It is done outside the write handler as an error was observed previously in this context
- *
- * @param[in]   p_event_data   Undefined pointer.
- * @param[in]   event_size     Size of 0.
- */
-//void stop_notify (void *p_event_data, uint16_t event_size)
-//{
-//    uint32_t err_code;
-//
-//    if (event_size == 0)
-//    {
-//        err_code = ble_bluetrack_stop_update(&m_bluetrack);
-//        APP_ERROR_CHECK(err_code);
-//    }
-//    else
-//    {
-//        APP_ERROR_CHECK(NRF_ERROR_INVALID_LENGTH);
-//    }
-//}
-
-
 /**@brief Function for handling a write to the Programming Track Select characteristic.
  *
  * @details This function enters programming mode if select is true by enabling the programming track output and indicating via LED.
@@ -746,36 +723,38 @@ static void stop_write_handler(ble_bluetrack_t * p_bluetrack, uint8_t stop)
 {
     NRF_LOG_INFO("Stop Written");
 
-//    UNUSED_VARIABLE(p_bluetrack);
-//    uint32_t err_code;
-//
-//    // First clear all periodic speed commands
+    uint32_t err_code;
+
+    // First clear all periodic speed commands
 //    remove_all_speed_commands();
-//    
-//    if (stop)
-//    {
-//        // Turn on brake
-//        nrf_gpio_pin_clear(BRAKE_PIN_NO);
-//
-//        // Indicate on LED
-//        nrf_gpio_pin_set(STOP_LED_PIN_NO);
-//    }
-//    else if (!stop)
-//    {
-//        // Indicate on LED
-//        nrf_gpio_pin_clear(STOP_LED_PIN_NO);
-//
-//        // Only start DCC output if disabled flag is not set
-//        if (!dcc_disabled)
-//        {
-//            // Release the brake
-//            nrf_gpio_pin_set(BRAKE_PIN_NO);
-//        }
-//    }
-//
-//    // Notify the client
-//    err_code = app_sched_event_put(NULL, 0, stop_notify);
-//    APP_ERROR_CHECK(err_code);
+ 
+    if (stop)
+    {
+        // Turn on brake
+        nrf_drv_gpiote_out_clear(BRAKE_N_PIN_NO);
+
+        // Indicate on LED
+        nrf_drv_gpiote_out_set(STOP_LED_PIN_NO);
+    }
+    else if (!stop)
+    {
+        // Indicate on LED
+        nrf_drv_gpiote_out_clear(STOP_LED_PIN_NO);
+
+        // Only start DCC output if disabled flag is not set
+        if (!dcc_disabled)
+        {
+            // Release the brake
+            nrf_drv_gpiote_out_set(BRAKE_N_PIN_NO);
+        }
+    }
+
+    // Notify the client
+    err_code = ble_bluetrack_stop_update(m_conn_handle, &m_bluetrack);
+    if (err_code != BLE_ERROR_INVALID_CONN_HANDLE && err_code != NRF_ERROR_INVALID_STATE)
+    {
+        APP_ERROR_CHECK(err_code);
+    }
 }
 
 
