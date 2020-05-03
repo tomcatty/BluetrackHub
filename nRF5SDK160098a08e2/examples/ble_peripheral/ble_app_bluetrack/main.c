@@ -85,7 +85,7 @@
 #define PROG_I_SENSE_PIN                26
 #define PROG_DCC_PIN_NO                 27                            
 #define THERMAL_N_PIN_NO                28
-#define OVER_LED_PIN_NO                 29
+#define ERROR_LED_PIN_NO                 29
 #define BLE_LED_PIN_NO                  30
 #define PROG_LED_PIN_NO                 31
 
@@ -133,7 +133,7 @@
 
 //#define DCC_COMMAND_BUFFER_SIZE         52                                          /**< Size of DCC Command buffer, this is 32+20 for worst case service mode*/
 
-//#define ACTUATION_INTERVAL              1000                                        /**< Relay actuation interval (ms) (1s seems reasonable to guarantee actuation) */
+#define ACTUATION_INTERVAL_MS            1000                                        /**< Relay actuation interval (ms) (1s seems reasonable to guarantee actuation) */
 
 //#define ADC_SAMPLE_INTERVAL             0.5                                         /**< ADC sample interval (ms) (this allows at least 10 samples during a minimum 5ms feedback window, see S-9.2.3) */
 
@@ -266,30 +266,32 @@ static nrf_ppi_channel_t dcc_continuous_ones_to_prog_dcc;
 //void pstorage_sys_event_handler (uint32_t p_evt);
 
 //static ble_bluetrack_t                  m_bluetrack;                                          /**< BlueTrack service structure instance */
-//static app_timer_id_t                   output_timer;                                         /**< App Timer instance for relay output timing */
+
+APP_TIMER_DEF(output_timer);                                                                  /**< App Timer instance for relay output timing */
+
 //static app_timer_id_t                   feedback_timer;                                       /**< App Timer instance for feedback ADC measurement timing */
-static nrf_drv_gpiote_pin_t             output_index[N_OUTPUTS] = {RELAY_1_PIN_NO,            /**< Pin Number storage for the relay outputs */
-                                                                   RELAY_2_PIN_NO,
-                                                                   RELAY_3_PIN_NO,
-                                                                   RELAY_4_PIN_NO,
-                                                                   RELAY_5_PIN_NO,
-                                                                   RELAY_6_PIN_NO,
-                                                                   RELAY_7_PIN_NO,
-                                                                   RELAY_8_PIN_NO,
-                                                                   RELAY_9_PIN_NO,
-                                                                   RELAY_10_PIN_NO,
-                                                                   RELAY_11_PIN_NO,
-                                                                   RELAY_12_PIN_NO,
-                                                                   RELAY_13_PIN_NO,
-                                                                   RELAY_14_PIN_NO};
-//static bool                             output_flags[N_OUTPUTS];                              /**< Flags for requesting relay activation */
+static nrf_drv_gpiote_pin_t             output_pin[N_OUTPUTS] = {RELAY_1_PIN_NO,              /**< Pin Number storage for the relay outputs */
+                                                                 RELAY_2_PIN_NO,
+                                                                 RELAY_3_PIN_NO,
+                                                                 RELAY_4_PIN_NO,
+                                                                 RELAY_5_PIN_NO,
+                                                                 RELAY_6_PIN_NO,
+                                                                 RELAY_7_PIN_NO,
+                                                                 RELAY_8_PIN_NO,
+                                                                 RELAY_9_PIN_NO,
+                                                                 RELAY_10_PIN_NO,
+                                                                 RELAY_11_PIN_NO,
+                                                                 RELAY_12_PIN_NO,
+                                                                 RELAY_13_PIN_NO,
+                                                                 RELAY_14_PIN_NO};
+static bool                             output_flags[N_OUTPUTS];                              /**< Flags for requesting relay activation */
 //static dcc_command_t                    dcc_command_buffer[DCC_COMMAND_BUFFER_SIZE];          /**< DCC command buffer that stores pending commands */
 //static uint8_t                          producer_index;                                       /**< Index of the next available DCC command buffer slot that can be filled */
 //static uint8_t                          consumer_index;                                       /**< Index of the DCC command buffer slot currently being transmitted */
 //static bool                             phase1_complete;                                      /**< Flag to control phases of DCC command */
 //static bool                             phase2_complete;                                      /**< Flag to control phases of DCC command */
 //static bool                             dcc_output_state;                                     /**< Flag to track whether we are currently outputting a DCC 1 or 0 */
-//static bool                             dcc_disabled;                                         /**< Flag to indicate whether DCC has been disabled completely */
+static bool                             dcc_disabled;                                         /**< Flag to indicate whether DCC has been disabled completely */
 //static bool                             adc_baseline_flag;                                    /**< Flag to indicate to the ADC it should store its result as a baseline */
 //static uint32_t                         adc_baseline;                                         /**< Baseline of current feedback measurement */
 //static bool                             feedback_window_end;                                  /**< Flag to indicate that the feedback window should end */
@@ -334,23 +336,28 @@ static nrf_drv_gpiote_pin_t             output_index[N_OUTPUTS] = {RELAY_1_PIN_N
  * @details This function is called whenever the DCC output needs to be halted immediately (for example, in error condition). 
  * DCC output disabling is only resettable by complete system reset. 
  */
-//static void disable_DCC (uint8_t error_code)
-//{
-//    uint32_t err_code;
-//    
-//    // Raise flag
-//    dcc_disabled = true;
-//
-//    // Turn on brake
-//    nrf_gpio_pin_clear(BRAKE_PIN_NO);
-//
-//    // Indicate on LED
-//    nrf_gpio_pin_set(OVERLOAD_LED_PIN_NO);
-//    
-//    // Notify the client
-//    err_code = ble_bluetrack_error_update(&m_bluetrack, error_code);
-//    APP_ERROR_CHECK(err_code);
-//}
+static void disable_DCC (uint8_t error_code)
+{
+    uint32_t err_code;
+    
+    NRF_LOG_INFO("DCC Disabled, code: %d", error_code);
+
+    // Raise flag
+    dcc_disabled = true;
+
+    // Turn on brake
+    nrf_drv_gpiote_out_clear(BRAKE_N_PIN_NO);
+
+    // Indicate on LED
+    nrf_drv_gpiote_out_set(ERROR_LED_PIN_NO);
+    
+    // Notify the client
+    err_code = ble_bluetrack_error_update(m_conn_handle, &m_bluetrack, error_code);
+    if (err_code != BLE_ERROR_INVALID_CONN_HANDLE && err_code != NRF_ERROR_INVALID_STATE)
+    {
+        APP_ERROR_CHECK(err_code);
+    }
+}
 
 
 /**@brief Function for identifying an appropriate index for a periodic speed command. Returns SPEED_COMMAND_ARRAY_SIZE if full.
@@ -387,16 +394,14 @@ static nrf_drv_gpiote_pin_t             output_index[N_OUTPUTS] = {RELAY_1_PIN_N
  */
 static void address_write_handler(ble_bluetrack_t * p_bluetrack, uint8_t address)
 {
-    NRF_LOG_INFO("Address Written");
+    NRF_LOG_INFO("Address %d Written", address);
 
-//    UNUSED_VARIABLE(p_bluetrack);
-//
-//    // First check address is in range.
-//    if (address < N_OUTPUTS)
-//    {
-//        // Raise flag for actuation
-//        output_flags[address] = true;
-//    }
+    // First check address is in range.
+    if (address < N_OUTPUTS)
+    {
+        // Raise flag for actuation
+        output_flags[address] = true;
+    }
 }
 
 
@@ -1237,7 +1242,7 @@ void thermal_n_hi_to_lo_handler(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t act
 {
     NRF_LOG_INFO("THERMAL_N signal went high to low");
     // Disable DCC
-    //disable_DCC(ERROR_CODE_OVERTEMPERATURE);
+    disable_DCC(ERROR_CODE_OVERTEMPERATURE);
 }
 
 
@@ -1675,51 +1680,51 @@ void timer_dcc_data_event_handler(nrf_timer_event_t event_type, void* p_context)
  * @details Output application timer runs continuously. Every time it completes, it checks if it needs to actuate a relay output by looking at the flags. It passes the value of
  * the relay output to itself so it can clear it on expiry. Flags are searched independent of raise order. Only one relay is ever actuated at a time to protect the power supply.
  */
-//static void output_timer_timeout_handler(void *p_context)
-//{
-//    uint32_t * index = (uint32_t*)p_context;
-//    uint32_t i, err_code;
-//    bool enqueued_output = false;
-//
-//    // Turn off output if one was actuated
-//    if (index != NULL)
-//    {
-//        nrf_gpio_pin_clear(*index);
-//    }
-//
-//    // Look for an enqueued output and start timer if we find one
-//    for (i = 0; i < (N_OUTPUTS); i++)
-//    {
-//        if (output_flags[i])
-//        {
-//            enqueued_output = true;
-//
-//            // Lower flag
-//            output_flags[i] = false;
-//
-//            // Turn on output
-//            nrf_gpio_pin_set(output_index[i]);
-//
-//            // Start timer.
-//            err_code = app_timer_start(output_timer, APP_TIMER_TICKS(ACTUATION_INTERVAL, APP_TIMER_PRESCALER), &(output_index[i]));
-//            APP_ERROR_CHECK(err_code);
-//
-//            // Only one relay is to be actuated at at time to protect the power supply.
-//            break;
-//        }
-//    }
-//
-//    if (!enqueued_output)
-//    {
-//        // Start timer with no output actuation
-//        err_code = app_timer_start(output_timer, APP_TIMER_TICKS(ACTUATION_INTERVAL, APP_TIMER_PRESCALER), NULL);
-//        APP_ERROR_CHECK(err_code);
-//    }
-//#ifdef DEBUG
-//    err_code = app_uart_put_string("Output timer fired\n\r");
-//    APP_ERROR_CHECK(err_code);
-//#endif
-//}
+static void output_timer_timeout_handler(void *p_context)
+{
+    nrf_drv_gpiote_pin_t * p_pin_to_clear = (nrf_drv_gpiote_pin_t*)p_context;
+    uint32_t i, err_code;
+    bool enqueued_output = false;
+
+    // Turn off output if one was actuated
+    if (p_pin_to_clear != NULL)
+    {
+        NRF_LOG_INFO("Turning off pin %d", *p_pin_to_clear);
+        nrf_drv_gpiote_out_clear(*p_pin_to_clear);
+    }
+
+    // Look for an enqueued output and start timer if we find one
+    for (i = 0; i < (N_OUTPUTS); i++)
+    {
+        if (output_flags[i])
+        {
+            NRF_LOG_INFO("Output %d to be actuated", i);
+
+            enqueued_output = true;
+
+            // Lower flag
+            output_flags[i] = false;
+
+            // Turn on output
+            NRF_LOG_INFO("Turning on pin %d", output_pin[i]);
+            nrf_drv_gpiote_out_set(output_pin[i]);
+
+            // Start timer.
+            err_code = app_timer_start(output_timer, APP_TIMER_TICKS(ACTUATION_INTERVAL_MS), &(output_pin[i]));
+            APP_ERROR_CHECK(err_code);
+
+            // Only one relay is to be actuated at at time to protect the power supply.
+            break;
+        }
+    }
+
+    if (!enqueued_output)
+    {
+        // Start timer with no output actuation
+        err_code = app_timer_start(output_timer, APP_TIMER_TICKS(ACTUATION_INTERVAL_MS), NULL);
+        APP_ERROR_CHECK(err_code);
+    }
+}
 
 
 /**@brief Function for initialising the GPIOTE module.
@@ -1748,7 +1753,7 @@ static void gpiote_init(void)
     // Initialise relay outputs (start not actuated) - under CPU control
     for (i =0; i < (N_OUTPUTS); i++)
     {
-        err_code = nrf_drv_gpiote_out_init(output_index[i], &config_out_simple_false);
+        err_code = nrf_drv_gpiote_out_init(output_pin[i], &config_out_simple_false);
         APP_ERROR_CHECK(err_code);
     }
 
@@ -1770,8 +1775,8 @@ static void gpiote_init(void)
     err_code = nrf_drv_gpiote_in_init(THERMAL_N_PIN_NO, &config_in, thermal_n_hi_to_lo_handler);
     APP_ERROR_CHECK(err_code);
 
-    // Initialise overload/overtemperature LED (start with no overload/overtemperature) - under CPU control
-    err_code = nrf_drv_gpiote_out_init(OVER_LED_PIN_NO, &config_out_simple_false);
+    // Initialise error LED (start with no error) - under CPU control
+    err_code = nrf_drv_gpiote_out_init(ERROR_LED_PIN_NO, &config_out_simple_false);
     APP_ERROR_CHECK(err_code);
 
     // Initialise BLE LED (start off) - under PPI control
@@ -1782,15 +1787,6 @@ static void gpiote_init(void)
     // Initialise programming LED (start not in programming mode) - under CPU control
     err_code = nrf_drv_gpiote_out_init(PROG_LED_PIN_NO, &config_out_simple_false);
     APP_ERROR_CHECK(err_code);
-
-    // Enable the thermal interrupt only after all pins are conifigured
-    nrf_drv_gpiote_in_event_enable(THERMAL_N_PIN_NO, true);
-
-    // Check if thermal input is already low, and if so disable DCC
-    if (!nrf_drv_gpiote_in_is_set(THERMAL_N_PIN_NO))
-    {
-        //disable_DCC(ERROR_CODE_OVERTEMPERATURE);
-    }
 }
 
 
@@ -1821,13 +1817,13 @@ static void timers_init(void)
     APP_ERROR_CHECK(err_code);
     nrf_drv_timer_extended_compare(&TIMER_DCC_CONTINOUS_ONES, NRF_TIMER_CC_CHANNEL0, nrf_drv_timer_us_to_ticks(&TIMER_DCC_CONTINOUS_ONES, DCC_ONE_TIME_US), NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK, false);
 
-    // Initialize timer module
+    // Initialize application timer module
     err_code = app_timer_init();
     APP_ERROR_CHECK(err_code);
 
     // Create output application timer
-    //err_code = app_timer_create(&output_timer, APP_TIMER_MODE_SINGLE_SHOT, output_timer_timeout_handler);
-    //APP_ERROR_CHECK(err_code);
+    err_code = app_timer_create(&output_timer, APP_TIMER_MODE_SINGLE_SHOT, output_timer_timeout_handler);
+    APP_ERROR_CHECK(err_code);
     // Create feedback application timer
     //err_code = app_timer_create(&feedback_timer, APP_TIMER_MODE_SINGLE_SHOT, feedback_timer_timeout_handler);
     //APP_ERROR_CHECK(err_code);
@@ -1950,70 +1946,68 @@ static void scheduler_init(void)
 
 /**@brief Function for initializing BlueTrack data structures.
  */
-//static void bluetrack_init(void)
-//{
-//    uint32_t i;
-//
-//    // Populate index array and initialise flags
-//    for(i = 0; i < (N_OUTPUTS); i++)
-//    {
-//        output_index[i] = i + OUTPUT_OFFSET;
-//        output_flags[i] = false;
-//    }
-//
-//    // Clear buffer
-//    memset(dcc_command_buffer, 0, sizeof(dcc_command_buffer));
-//    
-//    // Clear idle memory
-//    memset(&idle_packet, 0, sizeof(idle_packet));
-//
-//    // Set indexes and phases
-//    producer_index = 0;
-//    consumer_index = 0;
-//    phase1_complete = true;
-//    phase2_complete = false;
-//
-//    // We start with no pending speed commands
-//    remove_all_speed_commands();
-//    active_speed_command_index = 0;
-//    
-//    // Send ones at the start
-//    dcc_output_state = true;
-//
-//    // We start off with DCC enabled
-//    dcc_disabled = false;
-//
-//    // We start of with feedback not in progress
-//    feedback_in_progress = false;
-//
-//    // We start off with the main track selected
-//    programming_track_mode = MAIN;
-//    programming_track_state = MAIN;
-//    
-//    // We start off with no service command pending
-//    service_command_pending = false;
-//    
-//    // We start off with no service command in progress
-//    service_command_in_progress = false;
-//    
-//    // We do not send 20 reset packets and 10 idle packets, as suggested by S-9.2.4
-//}
+static void bluetrack_init(void)
+{
+    uint32_t i;
+
+    // Populate index array and initialise flags
+    for(i = 0; i < (N_OUTPUTS); i++)
+    {
+        output_flags[i] = false;
+    }
+
+    // Clear buffer
+    //memset(dcc_command_buffer, 0, sizeof(dcc_command_buffer));
+    
+    // Clear idle memory
+    //memset(&idle_packet, 0, sizeof(idle_packet));
+
+    // Set indexes and phases
+    //producer_index = 0;
+    //consumer_index = 0;
+    //phase1_complete = true;
+    //phase2_complete = false;
+
+    // We start with no pending speed commands
+    //remove_all_speed_commands();
+    //active_speed_command_index = 0;
+    
+    // Send ones at the start
+    //dcc_output_state = true;
+
+    // We start off with DCC enabled
+    dcc_disabled = false;
+
+    // We start of with feedback not in progress
+    //feedback_in_progress = false;
+
+    // We start off with the main track selected
+    //programming_track_mode = MAIN;
+    //programming_track_state = MAIN;
+    
+    // We start off with no service command pending
+    //service_command_pending = false;
+    
+    // We start off with no service command in progress
+    //service_command_in_progress = false;
+
+    // We do not send 20 reset packets and 10 idle packets, as suggested by S-9.2.4
+}
 
 
 /**@brief Function for starting timers.
 */
 static void timers_start(void)
 {
-    //uint32_t err_code;
+    uint32_t err_code;
 
     nrf_drv_timer_enable(&TIMER_DCC_DATA);
     nrf_drv_timer_enable(&TIMER_BLE_LED);
     nrf_drv_timer_enable(&TIMER_DCC_CONTINOUS_ONES);
 
     // Start relay timer
-    //err_code = app_timer_start(output_timer, APP_TIMER_TICKS(ACTUATION_INTERVAL, APP_TIMER_PRESCALER), NULL);
-    //APP_ERROR_CHECK(err_code);
-
+    err_code = app_timer_start(output_timer, APP_TIMER_TICKS(ACTUATION_INTERVAL_MS), NULL);
+    APP_ERROR_CHECK(err_code);
 }
 
 
@@ -2432,6 +2426,21 @@ static void power_management_init(void)
 }
 
 
+/**@brief Function for initialising the safety checks.
+ */
+static void safety_init(void)
+{
+    // Enable the thermal interrupt
+    nrf_drv_gpiote_in_event_enable(THERMAL_N_PIN_NO, true);
+
+    // Check if thermal input is already low, and if so disable DCC
+    if (!nrf_drv_gpiote_in_is_set(THERMAL_N_PIN_NO))
+    {
+        disable_DCC(ERROR_CODE_OVERTEMPERATURE);
+    }
+}
+
+
 /**@brief Function for handling the idle state (main loop).
  *
  * @details If there is no pending log operation, then sleep until next the next event occurs.
@@ -2464,8 +2473,8 @@ int main(void)
     ppi_init();
 //    lpcomp_init();
 //    adc_init();
-//    bluetrack_init();
-
+    bluetrack_init();
+    safety_init();
     // Start execution
     NRF_LOG_INFO("Bluetrack started.");
     timers_start();
