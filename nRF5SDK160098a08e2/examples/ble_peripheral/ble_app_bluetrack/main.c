@@ -27,8 +27,6 @@
 #include "nordic_common.h"
 #include "nrf.h"
 #include "app_error.h"
-//#include "nrf_gpio.h"
-//#include "nrf51_bitfields.h"
 #include "ble.h"
 #include "ble_err.h"
 #include "ble_hci.h"
@@ -39,21 +37,16 @@
 #include "nrf_sdh_ble.h"
 #include "boards.h"
 #include "app_scheduler.h"
-//#include "softdevice_handler.h"
 #include "app_timer.h"
-//#include "ble_error_log.h"
-//#include "ble_debug_assert_handler.h"
-//#include "pstorage.h"
 #include "ble_bluetrack.h"
 #include "ble_dis.h"
-//#include "app_util_platform.h"
-//#include "app_uart.h"
 #include "nrf_ble_gatt.h"
 #include "nrf_ble_qwr.h"
 #include "nrf_pwr_mgmt.h"
 #include "nrf_drv_gpiote.h"
 #include "nrf_drv_timer.h"
 #include "nrf_drv_ppi.h"
+#include "nrf_drv_saadc.h"
 
 #include "nrf_log.h"
 #include "nrf_log_ctrl.h"
@@ -61,7 +54,7 @@
 
 #include "gatts_cache_manager.h"
 
-#define DREKKER_DEVELOPMENT_COMPANY_IDENTIFIER 0x0343                               /**< Assigned by Bluetooth SIG. */            
+#define DREKKER_DEVELOPMENT_COMPANY_ID  0x0343                                      /**< Assigned by Bluetooth SIG. */            
 
 #define MAIN_DCC_PIN_NO                 2
 #define MAIN_I_SENSE_PIN_NO             3
@@ -85,9 +78,18 @@
 #define PROG_I_SENSE_PIN                26
 #define PROG_DCC_PIN_NO                 27                            
 #define THERMAL_N_PIN_NO                28
-#define ERROR_LED_PIN_NO                 29
+#define ERROR_LED_PIN_NO                29
 #define BLE_LED_PIN_NO                  30
 #define PROG_LED_PIN_NO                 31
+
+#define MAIN_I_SENSE_INPUT              NRF_SAADC_INPUT_AIN1
+// TODO fix this once pin is remapped
+#define PROG_I_SENSE_INPUT              NRF_SAADC_INPUT_DISABLED
+#define MAIN_I_SENSE_CHANNEL            0                                           /**< ADC channel used for MAIN current sense, this is also the index for the result in adc_buffer */
+#define PROG_I_SENSE_CHANNEL            1                                           /**< ADC channel used for PROG current sense, this is also the index for the result in adc_buffer */
+#define ADC_BUFFER_SIZE                 2                                           /**< Only store a single sample from each MAIN and PROG channel */
+#define ADC_LIMIT                       14254                                       /**< Corresponds to 3A for minimum sensitivity and 2A for maximum sensitivity */
+#define ADC_DELTA                       285                                         /**< ADC value above the baseline required to trigger an acknowledge, corresponds to 60mA for minimum sensitivity and 40mA for maximum sensitivity */
 
 #define N_OUTPUTS                       14                                          /**< 14 Relay Outputs in total */
 
@@ -95,41 +97,9 @@
 #define DCC_ZERO_TIME_US                100                                         /**< 100us (see S-9.1) */
 
 #define BLE_LED_TOGGLE_TIME_MS          500                                         /**< Advertising LED toggles every 500ms */
-//#define ADC_DELTA                       20                                          /**< ADC value above the baseline required to trigger an acknowledge */
-                                                                                    /* 10 bit ADC, 1.2V bandgap reference, and 1.74kohm sense resistor gives the following resolutions:
-                                                                                     300uA/A (min) sensitivity - 1.497mA
-                                                                                     377uA/A (nom) sensitivity - 1.786mA
-                                                                                     450uA/A (max) sensitivity - 2.245mA
-                                                                                     
-                                                                                     20 counts above baseline gives the following deltas:
-                                                                                     300uA/A (min) sensitivity - 29.933mA
-                                                                                     377uA/A (nom) sensitivity - 35.729mA
-                                                                                     450uA/A (max) sensitivity - 44.899mA
-                                                                                     
-                                                                                     This allows detection of the minimum 60mA delta specified in S-9.2.3 */
 
 #define MIN_DCC_LEN                     2                                           /**< Minimum length (in bytes) of a DCC command (excluding error byte, see S-9.2.1) */
 #define MAX_DCC_LEN                     5                                           /**< Maximum length (in bytes) of a DCC command (excluding error byte, see S-9.2.1) */
-
-//#define TIMER1_IRQ_PRI                  APP_IRQ_PRIORITY_HIGH                       /**< Set priority of DCC timer to application high */
-//#define TIMER1_PRESCALER_VAL            0                                           /**< Set base period to 62.5ns */
-//#define DCC_ONE_CC_VAL                  928                                         /**< 928 * 62.5ns = 58us (see S-9.1) */
-//#define DCC_ZERO_CC_VAL                 1600                                        /**< 1600 * 62.5ns = 100us (see S-9.1) */
-
-//#define TIMER2_PRESCALER_VAL_LED        7                                           /**< Set base period to 80us when driving an LED */
-//#define TIMER2_PRESCALER_VAL_DCC        TIMER1_PRESCALER_VAL                        /**< Set base period to 62.5ns when driving the programming DCC output */
-//#define TIMER2_CC_VAL_LED               62500                                       /**< 62500 * 80us = 500ms (advertising LED toggles every 500ms) */
-
-//#define LPCOMP_IRQ_PRI                  APP_IRQ_PRIORITY_HIGH                       /**< Set priority of comparator to application high */
-
-//#define GPIOTE_IRQ_PRI                  APP_IRQ_PRIORITY_HIGH                       /**< Set priority of GPIOTE to application high */
-
-//#define ADC_IRQ_PRI                     APP_IRQ_PRIORITY_HIGH                       /**< Set priority of ADC to application high */
-
-//#define UART_IRQ_PRI                    APP_IRQ_PRIORITY_LOW                        /**< Set priority of UART to application low */
-
-//#define UART_FIFO_TX_SIZE               128                                         /**< UART TX FIFO size (must be power of 2) */
-//#define UART_FIFO_RX_SIZE               128                                         /**< UART RX FIFO size (must be power of 2) */
 
 #define DCC_COMMAND_BUFFER_SIZE         52                                          /**< Size of DCC Command buffer, this is 32+20 for worst case service mode*/
 
@@ -173,10 +143,6 @@
 #define APP_ADV_INTERVAL                MSEC_TO_UNITS(20, UNIT_0_625_MS )          /**< The advertising interval, 20ms recommended by R12 of Accessory Design Guidelines for Apple Devices */
 #define APP_ADV_DURATION                BLE_GAP_ADV_TIMEOUT_GENERAL_UNLIMITED      /**< Advertising duration in 10 ms units. */
 
-//#define APP_TIMER_PRESCALER             0                                           /**< Value of the RTC1 PRESCALER register (no prescaling, maximum resolution). */
-//#define APP_TIMER_MAX_TIMERS            3                                           /**< Maximum number of simultaneously created timers (only output timer and feedback timer). */
-//#define APP_TIMER_OP_QUEUE_SIZE         4                                           /**< Size of timer operation queues (only output timer and feedback timer, + 1 for how the queue is implemented). */
-
 #define MIN_CONN_INTERVAL               MSEC_TO_UNITS(510, UNIT_1_25_MS)            /**< Minimum acceptable connection interval (0.51 seconds to comply with R12 of Accessory Design Guidelines for Apple Devices). */
 #define MAX_CONN_INTERVAL               MSEC_TO_UNITS(1000, UNIT_1_25_MS)           /**< Maximum acceptable connection interval (1 second). */
 #define SLAVE_LATENCY                   0                                           /**< Slave latency (0 to comply with R12 of Accessory Design Guidelines for Apple Devices). */
@@ -185,14 +151,6 @@
 #define FIRST_CONN_PARAMS_UPDATE_DELAY  APP_TIMER_TICKS(20000)                      /**< Time from initiating event (connect or start of notification) to first time sd_ble_gap_conn_param_update is called (5 seconds). */
 #define NEXT_CONN_PARAMS_UPDATE_DELAY   APP_TIMER_TICKS(5000)                       /**< Time between each call to sd_ble_gap_conn_param_update after the first call (30 seconds). */
 #define MAX_CONN_PARAMS_UPDATE_COUNT    3                                           /**< Number of attempts before giving up the connection parameter negotiation. */
-
-//#define SEC_PARAM_TIMEOUT               30                                          /**< Timeout for Pairing Request or Security Request (in seconds). */
-//#define SEC_PARAM_BOND                  1                                           /**< Perform bonding. */
-//#define SEC_PARAM_MITM                  0                                           /**< Man In The Middle protection not required. */
-//#define SEC_PARAM_IO_CAPABILITIES       BLE_GAP_IO_CAPS_NONE                        /**< No I/O capabilities. */
-//#define SEC_PARAM_OOB                   0                                           /**< Out Of Band data not available. */
-//#define SEC_PARAM_MIN_KEY_SIZE          7                                           /**< Minimum encryption key size. */
-//#define SEC_PARAM_MAX_KEY_SIZE          16                                          /**< Maximum encryption key size. */
 
 #define DEAD_BEEF                       0xDEADBEEF                                  /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
@@ -225,52 +183,38 @@ typedef struct
     uint8_t feedback;
 } scheduled_dcc_command_t;
 
-BLE_BLUETRACK_DEF(m_bluetrack);                                                 /**< Bluetrack Service instance. */
-NRF_BLE_GATT_DEF(m_gatt);                                                       /**< GATT module instance. */
-NRF_BLE_QWR_DEF(m_qwr);                                                         /**< Context for the Queued Write module.*/
+BLE_BLUETRACK_DEF(m_bluetrack);                                                                   /**< Bluetrack Service instance. */
+NRF_BLE_GATT_DEF(m_gatt);                                                                         /**< GATT module instance. */
+NRF_BLE_QWR_DEF(m_qwr);                                                                           /**< Context for the Queued Write module.*/
+APP_TIMER_DEF(output_timer);                                                                      /**< App Timer instance for relay output timing */
+APP_TIMER_DEF(feedback_timer);                                                                    /**< App Timer instance for feedback ADC measurement timing */
 
+const nrf_drv_timer_t                   TIMER_DCC_DATA =           NRF_DRV_TIMER_INSTANCE(1);
+const nrf_drv_timer_t                   TIMER_BLE_LED =            NRF_DRV_TIMER_INSTANCE(2);
+const nrf_drv_timer_t                   TIMER_DCC_CONTINOUS_ONES = NRF_DRV_TIMER_INSTANCE(3);
 
-//static ble_gap_sec_params_t             m_sec_params;                               /**< Security requirements for this application. */
-static uint16_t                         m_conn_handle = BLE_CONN_HANDLE_INVALID;    /**< Handle of the current connection. */
-static uint8_t m_adv_handle = BLE_GAP_ADV_SET_HANDLE_NOT_SET;                   /**< Advertising handle used to identify an advertising set. */
-static uint8_t m_enc_advdata[BLE_GAP_ADV_SET_DATA_SIZE_MAX];                    /**< Buffer for storing an encoded advertising set. */
-static uint8_t m_enc_scan_response_data[BLE_GAP_ADV_SET_DATA_SIZE_MAX];         /**< Buffer for storing an encoded scan data. */
-
-/**@brief Struct that contains pointers to the encoded advertising data. */
-static ble_gap_adv_data_t m_adv_data =
-{
-    .adv_data =
-    {
-        .p_data = m_enc_advdata,
-        .len    = BLE_GAP_ADV_SET_DATA_SIZE_MAX
-    },
-    .scan_rsp_data =
-    {
-        .p_data = m_enc_scan_response_data,
-        .len    = BLE_GAP_ADV_SET_DATA_SIZE_MAX
-
-    }
-};
-
-const nrf_drv_timer_t TIMER_DCC_DATA =           NRF_DRV_TIMER_INSTANCE(1);
-const nrf_drv_timer_t TIMER_BLE_LED =            NRF_DRV_TIMER_INSTANCE(2);
-const nrf_drv_timer_t TIMER_DCC_CONTINOUS_ONES = NRF_DRV_TIMER_INSTANCE(3);
-
-static nrf_ppi_channel_t ble_led_timer_to_ble_led;
-static nrf_ppi_channel_t dcc_data_to_main_dcc;
-static nrf_ppi_channel_t dcc_data_to_prog_dcc;
-static nrf_ppi_channel_t dcc_continuous_ones_to_main_dcc;
-static nrf_ppi_channel_t dcc_continuous_ones_to_prog_dcc;
-
-// Persistent storage system event handler
-//void pstorage_sys_event_handler (uint32_t p_evt);
-
-//static ble_bluetrack_t                  m_bluetrack;                                          /**< BlueTrack service structure instance */
-
-APP_TIMER_DEF(output_timer);                                                                  /**< App Timer instance for relay output timing */
-APP_TIMER_DEF(feedback_timer);                                                                /**< App Timer instance for feedback ADC measurement timing */
-
-static nrf_drv_gpiote_pin_t             output_pin[N_OUTPUTS] = {RELAY_1_PIN_NO,              /**< Pin Number storage for the relay outputs */
+static uint16_t                         m_conn_handle = BLE_CONN_HANDLE_INVALID;                  /**< Handle of the current connection. */
+static uint8_t                          m_adv_handle = BLE_GAP_ADV_SET_HANDLE_NOT_SET;            /**< Advertising handle used to identify an advertising set. */
+static uint8_t                          m_enc_advdata[BLE_GAP_ADV_SET_DATA_SIZE_MAX];             /**< Buffer for storing an encoded advertising set. */
+static uint8_t                          m_enc_scan_response_data[BLE_GAP_ADV_SET_DATA_SIZE_MAX];  /**< Buffer for storing an encoded scan data. */
+static ble_gap_adv_data_t               m_adv_data = {                                            /**< Struct that contains pointers to the encoded advertising data. */
+                                                             .adv_data =
+                                                         {
+                                                             .p_data = m_enc_advdata,
+                                                             .len    = BLE_GAP_ADV_SET_DATA_SIZE_MAX
+                                                         },
+                                                         .scan_rsp_data =
+                                                         {
+                                                             .p_data = m_enc_scan_response_data,
+                                                             .len    = BLE_GAP_ADV_SET_DATA_SIZE_MAX
+                                                         }
+                                                     };                                              
+static nrf_ppi_channel_t                ble_led_timer_to_ble_led;                                 /**< PPI channel linking BLE LED timer to the BLE LED */
+static nrf_ppi_channel_t                dcc_data_to_main_dcc;                                     /**< PPI channel linking DCC data timer to the main DCC output */
+static nrf_ppi_channel_t                dcc_data_to_prog_dcc;                                     /**< PPI channel linking DCC data timer to the programming DCC output */
+static nrf_ppi_channel_t                dcc_continuous_ones_to_main_dcc;                          /**< PPI channel linking DCC continuous ones timer to the main DCC output */
+static nrf_ppi_channel_t                dcc_continuous_ones_to_prog_dcc;                          /**< PPI channel linking DCC continuous ones timer to the programming DCC output */
+static nrf_drv_gpiote_pin_t             output_pin[N_OUTPUTS] = {RELAY_1_PIN_NO,                  /**< Pin Number storage for the relay outputs */
                                                                  RELAY_2_PIN_NO,
                                                                  RELAY_3_PIN_NO,
                                                                  RELAY_4_PIN_NO,
@@ -284,39 +228,39 @@ static nrf_drv_gpiote_pin_t             output_pin[N_OUTPUTS] = {RELAY_1_PIN_NO,
                                                                  RELAY_12_PIN_NO,
                                                                  RELAY_13_PIN_NO,
                                                                  RELAY_14_PIN_NO};
-static bool                             output_flags[N_OUTPUTS];                              /**< Flags for requesting relay activation */
-static dcc_command_t                    dcc_command_buffer[DCC_COMMAND_BUFFER_SIZE];          /**< DCC command buffer that stores pending commands */
-static uint8_t                          producer_index;                                       /**< Index of the next available DCC command buffer slot that can be filled */
-static uint8_t                          consumer_index;                                       /**< Index of the DCC command buffer slot currently being transmitted */
-static bool                             phase1_complete;                                      /**< Flag to control phases of DCC command */
-static bool                             phase2_complete;                                      /**< Flag to control phases of DCC command */
-static bool                             dcc_disabled;                                         /**< Flag to indicate whether DCC has been disabled completely */
-static bool                             adc_baseline_flag;                                    /**< Flag to indicate to the ADC it should store its result as a baseline */
-static uint32_t                         adc_baseline;                                         /**< Baseline of current feedback measurement */
-static bool                             feedback_window_end;                                  /**< Flag to indicate that the feedback window should end */
-static bool                             feedback_in_progress;                                 /**< Flag to indicate whether we are monitoring for feedback */
-static bool                             acknowledge;                                          /**< Flag to indicate an acknowledge was received during feedback */
-static bool                             service_command_pending;                              /**< Flag to indicate whether a service command is pending */
-static bool                             service_command_in_progress;                          /**< Flag to indicate whether a service command is in progress */
-static uint8_t                          programming_track_mode;                               /**< Variable to keep track of programming track mode, this is the mode requested by the characteristic */
-static uint8_t                          programming_track_state;                              /**< Variable to keep track of programming track state */
-static uint8_t                          function;                                             /**< Function of the service command pending/in progress */
-static uint8_t                          mode;                                                 /**< Mode of the service command pending/in progress */
-static uint8_t                          CV_or_reg_upper;                                      /**< Upper portion of CV or register of the service command pending/in progress */
-static uint8_t                          CV_or_reg_lower;                                      /**< Lower portion of CV or register of the service command pending/in progress */
-static uint8_t                          value;                                                /**< Value to be written of the service command pending/in progress */
-static uint16_t                         read_byte_counter;                                    /**< Read byte counter of the service command pending/in progress */
-static uint8_t                          read_bit_counter;                                     /**< Read bit counter of the service command pending/in progress */
-static uint8_t                          read_bit_value;                                       /**< Read bit response of the service command pending/in progress */
-static dcc_command_t                    idle_packet;                                          /**< Memory reserved to transmit idle packets */
-static uint32_t                         active_speed_command_index;                           /**< Current place in the speed command array */
-static dcc_command_t                    speed_command_array_temp[SPEED_COMMAND_ARRAY_SIZE];   /**< Array for sending periodic speed commands */
-static dcc_command_t                    speed_command_array[SPEED_COMMAND_ARRAY_SIZE];        /**< Array for storing periodic speed commands */
-static uint8_t                          speed_command_address_type[SPEED_COMMAND_ARRAY_SIZE]; /**< Array for keeping track of the address type the corresponding periodic speed command applies to */
-static uint16_t                         speed_command_address[SPEED_COMMAND_ARRAY_SIZE];      /**< Array for keeping track of the address the corresponding periodic speed command applies to */
-static dcc_command_t *                  active_packet;                                        /**< Tracks the active packet across DCC data timer handler calls */
-static bool                             dcc_packet;                                           /**< Tracks whether the active packet is from dcc_command_buffer across DCC data timer handler calls */
-
+static bool                             output_flags[N_OUTPUTS];                                  /**< Flags for requesting relay activation */
+static dcc_command_t                    dcc_command_buffer[DCC_COMMAND_BUFFER_SIZE];              /**< DCC command buffer that stores pending commands */
+static uint8_t                          producer_index;                                           /**< Index of the next available DCC command buffer slot that can be filled */
+static uint8_t                          consumer_index;                                           /**< Index of the DCC command buffer slot currently being transmitted */
+static bool                             phase1_complete;                                          /**< Flag to control phases of DCC command */
+static bool                             phase2_complete;                                          /**< Flag to control phases of DCC command */
+static bool                             dcc_disabled;                                             /**< Flag to indicate whether DCC has been disabled completely */
+static bool                             adc_baseline_flag;                                        /**< Flag to indicate to the ADC it should store its result as a baseline */
+static uint32_t                         adc_baseline;                                             /**< Baseline of current feedback measurement */
+static bool                             feedback_window_end;                                      /**< Flag to indicate that the feedback window should end */
+static bool                             feedback_in_progress;                                     /**< Flag to indicate whether we are monitoring for feedback */
+static bool                             acknowledge;                                              /**< Flag to indicate an acknowledge was received during feedback */
+static bool                             service_command_pending;                                  /**< Flag to indicate whether a service command is pending */
+static bool                             service_command_in_progress;                              /**< Flag to indicate whether a service command is in progress */
+static uint8_t                          programming_track_mode;                                   /**< Variable to keep track of programming track mode, this is the mode requested by the characteristic */
+static uint8_t                          programming_track_state;                                  /**< Variable to keep track of programming track state */
+static uint8_t                          function;                                                 /**< Function of the service command pending/in progress */
+static uint8_t                          mode;                                                     /**< Mode of the service command pending/in progress */
+static uint8_t                          CV_or_reg_upper;                                          /**< Upper portion of CV or register of the service command pending/in progress */
+static uint8_t                          CV_or_reg_lower;                                          /**< Lower portion of CV or register of the service command pending/in progress */
+static uint8_t                          value;                                                    /**< Value to be written of the service command pending/in progress */
+static uint16_t                         read_byte_counter;                                        /**< Read byte counter of the service command pending/in progress */
+static uint8_t                          read_bit_counter;                                         /**< Read bit counter of the service command pending/in progress */
+static uint8_t                          read_bit_value;                                           /**< Read bit response of the service command pending/in progress */
+static dcc_command_t                    idle_packet;                                              /**< Memory reserved to transmit idle packets */
+static uint32_t                         active_speed_command_index;                               /**< Current place in the speed command array */
+static dcc_command_t                    speed_command_array_temp[SPEED_COMMAND_ARRAY_SIZE];       /**< Array for sending periodic speed commands */
+static dcc_command_t                    speed_command_array[SPEED_COMMAND_ARRAY_SIZE];            /**< Array for storing periodic speed commands */
+static uint8_t                          speed_command_address_type[SPEED_COMMAND_ARRAY_SIZE];     /**< Array for keeping track of the address type the corresponding periodic speed command applies to */
+static uint16_t                         speed_command_address[SPEED_COMMAND_ARRAY_SIZE];          /**< Array for keeping track of the address the corresponding periodic speed command applies to */
+static dcc_command_t *                  active_packet;                                            /**< Tracks the active packet across DCC data timer handler calls */
+static bool                             dcc_packet;                                               /**< Tracks whether the active packet is from dcc_command_buffer across DCC data timer handler calls */
+static nrf_saadc_value_t                adc_buffer[ADC_BUFFER_SIZE];                              /**< ADC buffer for samples, stores lowest channel numbers first */
 
 /**@brief Function for removing all periodic speed commands
  */
@@ -354,7 +298,7 @@ static void disable_DCC (uint8_t error_code)
     
     // Notify the client
     err_code = ble_bluetrack_error_update(m_conn_handle, &m_bluetrack, error_code);
-    if (err_code != BLE_ERROR_INVALID_CONN_HANDLE && err_code != NRF_ERROR_INVALID_STATE)
+    if (err_code != BLE_ERROR_INVALID_CONN_HANDLE && err_code != NRF_ERROR_INVALID_STATE && err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
     {
         APP_ERROR_CHECK(err_code);
     }
@@ -1196,53 +1140,75 @@ void thermal_n_hi_to_lo_handler(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t act
 }
 
 
-/**@brief Function for handling the LPCOMP interrupt.
- *
- * @details The LPCOMP interrupt handler will only be called on a READY or UP event from the comparator. In both these cases, check the result of the comparison.
- * For the READY case, this checks if the comparator is already HIGH on activation. For the UP case, this provides a "debounce" of sorts. If the result is HIGH, 
- * disable DCC, as we are in an overcurrent condition. 
- */
-//void LPCOMP_IRQHandler(void)
-//{
-//    // Clear events
-//    NRF_LPCOMP->EVENTS_READY = 0;
-//    NRF_LPCOMP->EVENTS_UP = 0;
-//
-//    // We are either ready, or we observed a up crossing; obtain sample
-//    NRF_LPCOMP->TASKS_SAMPLE = 1;
-//    if (NRF_LPCOMP->RESULT)
-//    {
-//        // Disable DCC
-//        disable_DCC(ERROR_CODE_OVERCURRENT);
-//    }
-//}
-
-
 /**@brief Function for handling the ADC interrupt.
  *
- * @details The ADC interrupt handler will only be called on an END event. In this case, the result is read. Depending on the state of the application flags, 
- * this result is either stored as the baseline of a feedback collection, or compared to the baseline to determine whether the acknowledge flag should be raised.
+ * @details Called when the limits are exceeded (in which case DCC is disabled), or when a sample is collected. If a sample is collected it is only processed in a feedback window.
+ * Depending on the state of the application flags, this result is either stored as the baseline of a feedback collection, or compared to the baseline to determine whether the acknowledge flag should be raised.
  */
-//void ADC_IRQHandler(void)
-//{
-//    // Clear event
-//    NRF_ADC->EVENTS_END = 0;
-//
-//    // Record or compare to baseline
-//    if (adc_baseline_flag)
-//    {
-//        adc_baseline = NRF_ADC->RESULT;
-//        adc_baseline_flag = false;
-//    }
-//    else
-//    {
-//        // Set acknowledge if the result was the required amount above the baseline
-//        if (NRF_ADC->RESULT > (adc_baseline + ADC_DELTA))
-//        {
-//            acknowledge = true;
-//        }
-//    }
-//}
+void saadc_event_handler(nrfx_saadc_evt_t const *p_event)
+{
+    NRF_LOG_INFO("ADC event handler");
+    ret_code_t err_code;
+    nrf_saadc_value_t result;
+
+    if (p_event->type == NRFX_SAADC_EVT_DONE)
+    {
+        if (feedback_in_progress && !feedback_window_end)
+        {
+            if (p_event->data.done.size != ADC_BUFFER_SIZE)
+            {
+                APP_ERROR_CHECK(NRF_ERROR_INVALID_LENGTH);
+            }
+
+            if (programming_track_state == MAIN)
+            {
+                result = p_event->data.done.p_buffer[MAIN_I_SENSE_CHANNEL];
+                NRF_LOG_INFO("ADC result %d in main track state", result);
+            }
+            else if (programming_track_state == PROGRAMMING)
+            {
+                result = p_event->data.done.p_buffer[PROG_I_SENSE_CHANNEL];
+                NRF_LOG_INFO("ADC result %d in programming track state", result);
+            }
+            else
+            {
+                // We don't expect to be in MAIN_REPEAT, as feedback can't be started unless we have a DCC packet
+                APP_ERROR_CHECK(NRF_ERROR_INVALID_FLAGS);
+            }
+
+            // Record or compare to baseline
+            if (adc_baseline_flag)
+            {
+                adc_baseline = result;
+                adc_baseline_flag = false;
+                NRF_LOG_INFO("ADC result stored as baseline");
+            }
+            else
+            {
+                // Set acknowledge if the result was the required amount above the baseline
+                if (result > (adc_baseline + ADC_DELTA))
+                {
+                    acknowledge = true;
+                    NRF_LOG_INFO("ADC result %d higher than baseline %d + delta %d", result, adc_baseline, ADC_DELTA);
+                }
+            }
+        }
+    }
+    else if(p_event->type == NRFX_SAADC_EVT_LIMIT)
+    {
+        // Disable DCC
+        disable_DCC(ERROR_CODE_OVERCURRENT);
+    } 
+    else
+    {
+        // We don't expect any other type of event
+        APP_ERROR_CHECK(NRF_ERROR_INVALID_FLAGS);
+    }
+
+    // Start the timer
+    err_code = app_timer_start(feedback_timer, APP_TIMER_TICKS(ADC_SAMPLE_INTERVAL_MS), NULL);
+    APP_ERROR_CHECK(err_code);
+}
 
 
 /**@brief Dummy function for handling timer events.
@@ -1314,11 +1280,6 @@ void timer_dcc_data_event_handler(nrf_timer_event_t event_type, void* p_context)
                 adc_baseline_flag = true;
                 feedback_window_end = false;
                 acknowledge = false;
-                // Start ADC
-                //NRF_ADC->TASKS_START = 1;
-                // Start timer
-                err_code = app_timer_start(feedback_timer, APP_TIMER_TICKS(ADC_SAMPLE_INTERVAL_MS), NULL);
-                APP_ERROR_CHECK(err_code);
             }
             // Clear feedback flag, we do not want to check it again for this packet
             active_packet->feedback = false;
@@ -1526,83 +1487,79 @@ void timer_dcc_data_event_handler(nrf_timer_event_t event_type, void* p_context)
  */
 static void feedback_timer_timeout_handler(void *p_context)
 {
-//    uint32_t err_code;
-//
-//    UNUSED_VARIABLE(p_context);
-//
-//    // Check the counter; if expired, feedback window has finished
-//    if (!feedback_window_end)
-//    {
-//        // Trigger ADC sample
-//        NRF_ADC->TASKS_START = 1;
-//        err_code = app_timer_start(feedback_timer, APP_TIMER_TICKS(ADC_SAMPLE_INTERVAL, APP_TIMER_PRESCALER), NULL);
-//        APP_ERROR_CHECK(err_code);
-//    }
-//    else
-//    {
-//        // Buffer is empty in service mode
-//        if (function == FUNCTION_WRITE_BYTE || function == FUNCTION_WRITE_BIT)
-//        {
-//            // We are done now, transmit back result
-//            err_code = ble_bluetrack_response_update(&m_bluetrack, acknowledge ? 0x01 : 0x00, value);
-//            if (err_code != NRF_SUCCESS &&
-//                err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
-//                err_code != NRF_ERROR_INVALID_STATE)
-//            {
-//                APP_ERROR_CHECK(err_code);
-//            }
-//            service_command_in_progress = false;
-//        }
-//        else if (function == FUNCTION_READ_BYTE)
-//        {
-//            // Last condition is special case to avoid repeating the read byte values for an address mode read
-//            if (acknowledge || (read_byte_counter >= READ_BYTE_COUNTER_MAX) || (mode == MODE_ADDRESS && read_byte_counter >= READ_BIT_COUNTER_MAX_ADDRESS))
-//            {
-//                // We have either received a positive response, or we've exhausted all values, transmit back result
-//                err_code = ble_bluetrack_response_update(&m_bluetrack, acknowledge ? 0x01 : 0x00, read_byte_counter);
-//                if (err_code != NRF_SUCCESS &&
-//                    err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
-//                    err_code != NRF_ERROR_INVALID_STATE)
-//                {
-//                    APP_ERROR_CHECK(err_code);
-//                }
-//                service_command_in_progress = false;
-//            }
-//            else
-//            {
-//                // No response received, continue to try new values
-//                read_byte_counter = read_byte_counter + 1;
-//                err_code = app_sched_event_put(NULL, 0, execute_service_command);
-//                APP_ERROR_CHECK(err_code);
-//            }
-//        }
-//        else if (function == FUNCTION_READ_BIT)
-//        {
-//            read_bit_value = read_bit_value | ((acknowledge ? 1 : 0) << read_bit_counter);
-//            if (read_bit_counter >= READ_BIT_COUNTER_MAX)
-//            {
-//                // We have finished asking for the value of all bit positions, transmit back result
-//                err_code = ble_bluetrack_response_update(&m_bluetrack, 0x01, read_bit_value);
-//                if (err_code != NRF_SUCCESS &&
-//                    err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
-//                    err_code != NRF_ERROR_INVALID_STATE)
-//                {
-//                    APP_ERROR_CHECK(err_code);
-//                }
-//                service_command_in_progress = false;
-//            }
-//            else
-//            {
-//                // Ask for next bit position
-//                read_bit_counter = read_bit_counter + 1;
-//                err_code = app_sched_event_put(NULL, 0, execute_service_command);
-//                APP_ERROR_CHECK(err_code);
-//            }
-//        }
-//        
-//        // Lower feedback flag
-//        feedback_in_progress = false;
-//    }
+    NRF_LOG_INFO("Feedback timer fired");
+    ret_code_t err_code;
+
+    // Conclude the feedback window if it has ended
+    if (feedback_in_progress && feedback_window_end)
+    {
+        // Buffer is empty in service mode
+        if (function == FUNCTION_WRITE_BYTE || function == FUNCTION_WRITE_BIT)
+        {
+            // We are done now, transmit back result
+            err_code = ble_bluetrack_response_update(m_conn_handle, &m_bluetrack, acknowledge ? 0x01 : 0x00, value);
+            if (err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
+                err_code != NRF_ERROR_INVALID_STATE && 
+                err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
+            {
+                APP_ERROR_CHECK(err_code);
+            }
+            service_command_in_progress = false;
+        }
+        else if (function == FUNCTION_READ_BYTE)
+        {
+            // Last condition is special case to avoid repeating the read byte values for an address mode read
+            if (acknowledge || (read_byte_counter >= READ_BYTE_COUNTER_MAX) || (mode == MODE_ADDRESS && read_byte_counter >= READ_BIT_COUNTER_MAX_ADDRESS))
+            {
+                // We have either received a positive response, or we've exhausted all values, transmit back result
+                err_code = ble_bluetrack_response_update(m_conn_handle, &m_bluetrack, acknowledge ? 0x01 : 0x00, read_byte_counter);
+                if (err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
+                    err_code != NRF_ERROR_INVALID_STATE &&
+                    err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
+                {
+                    APP_ERROR_CHECK(err_code);
+                }
+                service_command_in_progress = false;
+            }
+            else
+            {
+                // No response received, continue to try new values
+                read_byte_counter = read_byte_counter + 1;
+                err_code = app_sched_event_put(NULL, 0, execute_service_command);
+                APP_ERROR_CHECK(err_code);
+            }
+        }
+        else if (function == FUNCTION_READ_BIT)
+        {
+            read_bit_value = read_bit_value | ((acknowledge ? 1 : 0) << read_bit_counter);
+            if (read_bit_counter >= READ_BIT_COUNTER_MAX)
+            {
+                // We have finished asking for the value of all bit positions, transmit back result
+                err_code = ble_bluetrack_response_update(m_conn_handle, &m_bluetrack, 0x01, read_bit_value);
+                if (err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
+                    err_code != NRF_ERROR_INVALID_STATE &&
+                    err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
+                {
+                    APP_ERROR_CHECK(err_code);
+                }
+                service_command_in_progress = false;
+            }
+            else
+            {
+                // Ask for next bit position
+                read_bit_counter = read_bit_counter + 1;
+                err_code = app_sched_event_put(NULL, 0, execute_service_command);
+                APP_ERROR_CHECK(err_code);
+            }
+        }
+        
+        // Lower feedback flag
+        feedback_in_progress = false;
+    }
+
+    // Start the ADC
+    err_code = nrfx_saadc_sample();
+    APP_ERROR_CHECK(err_code);
 }
 
 
@@ -1810,63 +1767,29 @@ static void ppi_init(void)
 }
 
 
-/**@brief Function for initializing the LPCOMP module.
- */
-//static void lpcomp_init(void)
-//{
-//    // Select P0.1 as the LPCOMP input (LPCOMP can be used concurrently with the ADC provided the input is the same, as only the PSEL MUX is shared, see https://devzone.nordicsemi.com/question/22244/can-i-really-not-use-lpcomp-and-adc-at-the-same-time/)
-//    NRF_LPCOMP->PSEL = LPCOMP_PSEL_PSEL_AnalogInput2;
-//    // Set reference to VDD * 7/8
-//    // For sense R = 1.74k, the trip points are:
-//
-//    // +---------------+------------+------------+
-//    // | Sensitivity   | VDD = 2.3V | VDD = 3.0V |
-//    // +---------------+------------+------------+
-//    // | 300uA/A (min) |    3.86A   |    5.03A   |
-//    // +---------------+------------+------------+
-//    // | 377uA/A (nom) |    3.07A   |    4.00A   |
-//    // +---------------+------------+------------+
-//    // | 450uA/A (max) |    2.57A   |    3.35A   |
-//    // +---------------+------------+------------+
-//    
-//    NRF_LPCOMP->REFSEL = LPCOMP_REFSEL_REFSEL_SupplySevenEighthsPrescaling;
-//    // Allow READY and UP event to trigger an interrupt
-//    NRF_LPCOMP->INTENSET = (LPCOMP_INTENSET_UP_Msk | LPCOMP_INTENSET_READY_Msk);
-//    // Finally, turn on the comparator
-//    NRF_LPCOMP->ENABLE = LPCOMP_ENABLE_ENABLE_Enabled;
-//
-//    // Register LPCOMP interrupt with softdevice
-//    NVIC_SetPriority(LPCOMP_IRQn, LPCOMP_IRQ_PRI);
-//    NVIC_ClearPendingIRQ(LPCOMP_IRQn);
-//    NVIC_EnableIRQ(LPCOMP_IRQn);
-//
-//    // Start up the comparator
-//    NRF_LPCOMP->TASKS_START = 1;
-//}
-
-
 /**@brief Function for initializing the ADC module.
 */
-//static void adc_init(void)
-//{
-//    // Select P0.1 as the ADC input (ADC can be used concurrently with the LPCOMP provided the input is the same), 1.2V bandgap as reference, no prescaling, and 10 bit resolution
-//    NRF_ADC->CONFIG = (
-//                       (ADC_CONFIG_EXTREFSEL_None << ADC_CONFIG_EXTREFSEL_Pos) |
-//                       (ADC_CONFIG_PSEL_AnalogInput2 << ADC_CONFIG_PSEL_Pos) |
-//                       (ADC_CONFIG_REFSEL_VBG << ADC_CONFIG_REFSEL_Pos) |
-//                       (ADC_CONFIG_INPSEL_AnalogInputNoPrescaling << ADC_CONFIG_INPSEL_Pos) |
-//                       (ADC_CONFIG_RES_10bit << ADC_CONFIG_RES_Pos)
-//                      );
-//    // Allow END event to trigger an interrupt
-//    NRF_ADC->INTENSET = ADC_INTENSET_END_Msk;
-//    // Finally, turn on the ADC
-//    NRF_ADC->ENABLE = ADC_ENABLE_ENABLE_Enabled;
-//
-//    // Register ADC interrupt with softdevice
-//    NVIC_SetPriority(ADC_IRQn, ADC_IRQ_PRI);
-//    NVIC_ClearPendingIRQ(ADC_IRQn);
-//    NVIC_EnableIRQ(ADC_IRQn);
-//}
+static void adc_init(void)
+{
+    ret_code_t                 err_code;
+    nrf_saadc_channel_config_t channel_config = NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(MAIN_I_SENSE_INPUT);
+    channel_config.gain = NRF_SAADC_GAIN1_3;
+
+    err_code = nrf_drv_saadc_init(NULL, saadc_event_handler);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = nrf_drv_saadc_channel_init(MAIN_I_SENSE_CHANNEL, &channel_config);
+    APP_ERROR_CHECK(err_code);
+    nrf_drv_saadc_limits_set(MAIN_I_SENSE_CHANNEL, NRF_DRV_SAADC_LIMITL_DISABLED, ADC_LIMIT);
+    
+    channel_config.pin_p = PROG_I_SENSE_INPUT;
+    err_code = nrf_drv_saadc_channel_init(PROG_I_SENSE_CHANNEL, &channel_config);
+    APP_ERROR_CHECK(err_code);
+    nrf_drv_saadc_limits_set(PROG_I_SENSE_CHANNEL, NRF_DRV_SAADC_LIMITL_DISABLED, ADC_LIMIT);
+
+    err_code = nrfx_saadc_buffer_convert(adc_buffer, ADC_BUFFER_SIZE);
+    APP_ERROR_CHECK(err_code);
+}
 
 
 /**@brief Function for the Event Scheduler initialization.
@@ -1939,6 +1862,10 @@ static void timers_start(void)
 
     // Start relay timer
     err_code = app_timer_start(output_timer, APP_TIMER_TICKS(ACTUATION_INTERVAL_MS), NULL);
+    APP_ERROR_CHECK(err_code);
+
+    // Start feedback timer
+    err_code = app_timer_start(feedback_timer, APP_TIMER_TICKS(ADC_SAMPLE_INTERVAL_MS), NULL);
     APP_ERROR_CHECK(err_code);
 }
 
@@ -2017,7 +1944,7 @@ static void advertising_init(void)
     firmware_version = NRF_UICR->CUSTOMER[0];
     
     // Construct manufacturing data
-    manuf_data.company_identifier = DREKKER_DEVELOPMENT_COMPANY_IDENTIFIER;
+    manuf_data.company_identifier = DREKKER_DEVELOPMENT_COMPANY_ID;
 
     deviceID[0] = NRF_FICR->DEVICEID[0];
     deviceID[1] = NRF_FICR->DEVICEID[1];
@@ -2366,6 +2293,8 @@ static void power_management_init(void)
  */
 static void safety_init(void)
 {
+    ret_code_t err_code;
+
     // Enable the thermal interrupt
     nrf_drv_gpiote_in_event_enable(THERMAL_N_PIN_NO, true);
 
@@ -2374,6 +2303,10 @@ static void safety_init(void)
     {
         disable_DCC(ERROR_CODE_OVERTEMPERATURE);
     }
+
+    // Start the ADC
+    err_code = nrfx_saadc_sample();
+    APP_ERROR_CHECK(err_code);
 }
 
 
@@ -2407,8 +2340,7 @@ int main(void)
     advertising_init();
     conn_params_init();
     ppi_init();
-//    lpcomp_init();
-//    adc_init();
+    adc_init();
     bluetrack_init();
     safety_init();
 

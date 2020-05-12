@@ -88,6 +88,7 @@
       <file file_name="../../../../../../modules/nrfx/drivers/src/nrfx_timer.c" />
       <file file_name="../../../../../../modules/nrfx/drivers/src/nrfx_ppi.c" />
       <file file_name="../../../../../../integration/nrfx/legacy/nrf_drv_ppi.c" />
+      <file file_name="../../../../../../modules/nrfx/drivers/src/nrfx_saadc.c" />
     </folder>
     <folder Name="Application">
       <file file_name="../../../main.c" />
