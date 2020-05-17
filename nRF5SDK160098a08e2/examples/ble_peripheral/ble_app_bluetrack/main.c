@@ -87,7 +87,6 @@
 #define PROG_I_SENSE_INPUT              NRF_SAADC_INPUT_DISABLED
 #define MAIN_I_SENSE_CHANNEL            0                                           /**< ADC channel used for MAIN current sense, this is also the index for the result in adc_buffer */
 #define PROG_I_SENSE_CHANNEL            1                                           /**< ADC channel used for PROG current sense, this is also the index for the result in adc_buffer */
-#define ADC_BUFFER_SIZE                 2                                           /**< Only store a single sample from each MAIN and PROG channel */
 #define ADC_LIMIT                       14254                                       /**< Corresponds to 3A for minimum sensitivity and 2A for maximum sensitivity */
 #define ADC_DELTA                       285                                         /**< ADC value above the baseline required to trigger an acknowledge, corresponds to 60mA for minimum sensitivity and 40mA for maximum sensitivity */
 
@@ -236,7 +235,7 @@ static bool                             phase1_complete;                        
 static bool                             phase2_complete;                                          /**< Flag to control phases of DCC command */
 static bool                             dcc_disabled;                                             /**< Flag to indicate whether DCC has been disabled completely */
 static bool                             adc_baseline_flag;                                        /**< Flag to indicate to the ADC it should store its result as a baseline */
-static uint32_t                         adc_baseline;                                             /**< Baseline of current feedback measurement */
+static nrf_saadc_value_t                adc_baseline;                                             /**< Baseline of current feedback measurement */
 static bool                             feedback_window_end;                                      /**< Flag to indicate that the feedback window should end */
 static bool                             feedback_in_progress;                                     /**< Flag to indicate whether we are monitoring for feedback */
 static bool                             acknowledge;                                              /**< Flag to indicate an acknowledge was received during feedback */
@@ -260,7 +259,6 @@ static uint8_t                          speed_command_address_type[SPEED_COMMAND
 static uint16_t                         speed_command_address[SPEED_COMMAND_ARRAY_SIZE];          /**< Array for keeping track of the address the corresponding periodic speed command applies to */
 static dcc_command_t *                  active_packet;                                            /**< Tracks the active packet across DCC data timer handler calls */
 static bool                             dcc_packet;                                               /**< Tracks whether the active packet is from dcc_command_buffer across DCC data timer handler calls */
-static nrf_saadc_value_t                adc_buffer[ADC_BUFFER_SIZE];                              /**< ADC buffer for samples, stores lowest channel numbers first */
 
 /**@brief Function for removing all periodic speed commands
  */
@@ -1140,77 +1138,6 @@ void thermal_n_hi_to_lo_handler(nrfx_gpiote_pin_t pin, nrf_gpiote_polarity_t act
 }
 
 
-/**@brief Function for handling the ADC interrupt.
- *
- * @details Called when the limits are exceeded (in which case DCC is disabled), or when a sample is collected. If a sample is collected it is only processed in a feedback window.
- * Depending on the state of the application flags, this result is either stored as the baseline of a feedback collection, or compared to the baseline to determine whether the acknowledge flag should be raised.
- */
-void saadc_event_handler(nrfx_saadc_evt_t const *p_event)
-{
-    NRF_LOG_INFO("ADC event handler");
-    ret_code_t err_code;
-    nrf_saadc_value_t result;
-
-    if (p_event->type == NRFX_SAADC_EVT_DONE)
-    {
-        if (feedback_in_progress && !feedback_window_end)
-        {
-            if (p_event->data.done.size != ADC_BUFFER_SIZE)
-            {
-                APP_ERROR_CHECK(NRF_ERROR_INVALID_LENGTH);
-            }
-
-            if (programming_track_state == MAIN)
-            {
-                result = p_event->data.done.p_buffer[MAIN_I_SENSE_CHANNEL];
-                NRF_LOG_INFO("ADC result %d in main track state", result);
-            }
-            else if (programming_track_state == PROGRAMMING)
-            {
-                result = p_event->data.done.p_buffer[PROG_I_SENSE_CHANNEL];
-                NRF_LOG_INFO("ADC result %d in programming track state", result);
-            }
-            else
-            {
-                // We don't expect to be in MAIN_REPEAT, as feedback can't be started unless we have a DCC packet
-                APP_ERROR_CHECK(NRF_ERROR_INVALID_FLAGS);
-            }
-
-            // Record or compare to baseline
-            if (adc_baseline_flag)
-            {
-                adc_baseline = result;
-                adc_baseline_flag = false;
-                NRF_LOG_INFO("ADC result stored as baseline");
-            }
-            else
-            {
-                // Set acknowledge if the result was the required amount above the baseline
-                if (result > (adc_baseline + ADC_DELTA))
-                {
-                    acknowledge = true;
-                    NRF_LOG_INFO("ADC result %d higher than baseline %d + delta %d", result, adc_baseline, ADC_DELTA);
-                }
-            }
-        }
-    }
-    else if(p_event->type == NRFX_SAADC_EVT_LIMIT)
-    {
-        // Disable DCC
-        disable_DCC(ERROR_CODE_OVERCURRENT);
-    } 
-    else
-    {
-        // We don't expect any other type of event
-        APP_ERROR_CHECK(NRF_ERROR_INVALID_FLAGS);
-    }
-
-    // Start the timer
-    err_code = app_timer_start(feedback_timer, APP_TIMER_TICKS(ADC_SAMPLE_INTERVAL_MS), NULL);
-    APP_ERROR_CHECK(err_code);
-}
-
-
 /**@brief Dummy function for handling timer events.
  *
  * @details This handler does nothing.
@@ -1218,6 +1145,16 @@ void saadc_event_handler(nrfx_saadc_evt_t const *p_event)
 void dummy_timer_event_handler(nrf_timer_event_t event_type, void* p_context)
 {
       NRF_LOG_INFO("Dummy timer event triggered");
+}
+
+
+/**@brief Dummy function for handling saadc events.
+ *
+ * @details This handler does nothing.
+ */
+void dummy_saadc_event_handler(nrfx_saadc_evt_t const *p_event)
+{
+      NRF_LOG_INFO("Dummy saadc event triggered");
 }
 
 
@@ -1482,83 +1419,137 @@ void timer_dcc_data_event_handler(nrf_timer_event_t event_type, void* p_context)
 
 /**@brief Function for handling the feedback application timer expiry.
  *
- * @details Feedback application timer runs continuously every feedback window until the DCC buffer is empty. Every time it completes, it triggers
- * another ADC sample, or terminates the feedback window and, if required, the service command.
+ * @details Feedback application timer runs continuously. Every time it fires the ADC is sampled and compared to limits. The sample is 
+ * only processed in a feedback window. Depending on the state of the application flags, this result is either stored as the
+ * baseline of a feedback collection, or compared to the baseline to determine whether the acknowledge flag should be raised.
+ * The feedback window is terminated if necessary, in this case the service command is continued or terminated. 
  */
 static void feedback_timer_timeout_handler(void *p_context)
 {
-    NRF_LOG_INFO("Feedback timer fired");
-    ret_code_t err_code;
+    ret_code_t        err_code;
+    nrf_saadc_value_t main_value;
+    nrf_saadc_value_t prog_value;
+    nrf_saadc_value_t value;
 
-    // Conclude the feedback window if it has ended
-    if (feedback_in_progress && feedback_window_end)
+    err_code = nrf_drv_saadc_sample_convert(MAIN_I_SENSE_CHANNEL, &main_value);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = nrf_drv_saadc_sample_convert(PROG_I_SENSE_CHANNEL, &prog_value);
+    APP_ERROR_CHECK(err_code);
+
+    NRF_LOG_INFO("Main value: %d, Prog value: %d", main_value, prog_value);
+
+    if ((main_value >= ADC_LIMIT) || (prog_value >= ADC_LIMIT))
     {
-        // Buffer is empty in service mode
-        if (function == FUNCTION_WRITE_BYTE || function == FUNCTION_WRITE_BIT)
-        {
-            // We are done now, transmit back result
-            err_code = ble_bluetrack_response_update(m_conn_handle, &m_bluetrack, acknowledge ? 0x01 : 0x00, value);
-            if (err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
-                err_code != NRF_ERROR_INVALID_STATE && 
-                err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
-            {
-                APP_ERROR_CHECK(err_code);
-            }
-            service_command_in_progress = false;
-        }
-        else if (function == FUNCTION_READ_BYTE)
-        {
-            // Last condition is special case to avoid repeating the read byte values for an address mode read
-            if (acknowledge || (read_byte_counter >= READ_BYTE_COUNTER_MAX) || (mode == MODE_ADDRESS && read_byte_counter >= READ_BIT_COUNTER_MAX_ADDRESS))
-            {
-                // We have either received a positive response, or we've exhausted all values, transmit back result
-                err_code = ble_bluetrack_response_update(m_conn_handle, &m_bluetrack, acknowledge ? 0x01 : 0x00, read_byte_counter);
-                if (err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
-                    err_code != NRF_ERROR_INVALID_STATE &&
-                    err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
-                {
-                    APP_ERROR_CHECK(err_code);
-                }
-                service_command_in_progress = false;
-            }
-            else
-            {
-                // No response received, continue to try new values
-                read_byte_counter = read_byte_counter + 1;
-                err_code = app_sched_event_put(NULL, 0, execute_service_command);
-                APP_ERROR_CHECK(err_code);
-            }
-        }
-        else if (function == FUNCTION_READ_BIT)
-        {
-            read_bit_value = read_bit_value | ((acknowledge ? 1 : 0) << read_bit_counter);
-            if (read_bit_counter >= READ_BIT_COUNTER_MAX)
-            {
-                // We have finished asking for the value of all bit positions, transmit back result
-                err_code = ble_bluetrack_response_update(m_conn_handle, &m_bluetrack, 0x01, read_bit_value);
-                if (err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
-                    err_code != NRF_ERROR_INVALID_STATE &&
-                    err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
-                {
-                    APP_ERROR_CHECK(err_code);
-                }
-                service_command_in_progress = false;
-            }
-            else
-            {
-                // Ask for next bit position
-                read_bit_counter = read_bit_counter + 1;
-                err_code = app_sched_event_put(NULL, 0, execute_service_command);
-                APP_ERROR_CHECK(err_code);
-            }
-        }
-        
-        // Lower feedback flag
-        feedback_in_progress = false;
+        NRF_LOG_INFO("Overcurrent error");
+        // Disable DCC
+        disable_DCC(ERROR_CODE_OVERCURRENT);
     }
 
-    // Start the ADC
-    err_code = nrfx_saadc_sample();
+    if (feedback_in_progress)
+    {
+        // Conclude the feedback window if it has ended
+        if (feedback_window_end)
+        {
+            // Buffer is empty in service mode
+            if (function == FUNCTION_WRITE_BYTE || function == FUNCTION_WRITE_BIT)
+            {
+                // We are done now, transmit back result
+                err_code = ble_bluetrack_response_update(m_conn_handle, &m_bluetrack, acknowledge ? 0x01 : 0x00, value);
+                if (err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
+                    err_code != NRF_ERROR_INVALID_STATE && 
+                    err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
+                {
+                    APP_ERROR_CHECK(err_code);
+                }
+                service_command_in_progress = false;
+            }
+            else if (function == FUNCTION_READ_BYTE)
+            {
+                // Last condition is special case to avoid repeating the read byte values for an address mode read
+                if (acknowledge || (read_byte_counter >= READ_BYTE_COUNTER_MAX) || (mode == MODE_ADDRESS && read_byte_counter >= READ_BIT_COUNTER_MAX_ADDRESS))
+                {
+                    // We have either received a positive response, or we've exhausted all values, transmit back result
+                    err_code = ble_bluetrack_response_update(m_conn_handle, &m_bluetrack, acknowledge ? 0x01 : 0x00, read_byte_counter);
+                    if (err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
+                        err_code != NRF_ERROR_INVALID_STATE &&
+                        err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
+                    {
+                        APP_ERROR_CHECK(err_code);
+                    }
+                    service_command_in_progress = false;
+                }
+                else
+                {
+                    // No response received, continue to try new values
+                    read_byte_counter = read_byte_counter + 1;
+                    err_code = app_sched_event_put(NULL, 0, execute_service_command);
+                    APP_ERROR_CHECK(err_code);
+                }
+            }
+            else if (function == FUNCTION_READ_BIT)
+            {
+                read_bit_value = read_bit_value | ((acknowledge ? 1 : 0) << read_bit_counter);
+                if (read_bit_counter >= READ_BIT_COUNTER_MAX)
+                {
+                    // We have finished asking for the value of all bit positions, transmit back result
+                    err_code = ble_bluetrack_response_update(m_conn_handle, &m_bluetrack, 0x01, read_bit_value);
+                    if (err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
+                        err_code != NRF_ERROR_INVALID_STATE &&
+                        err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
+                    {
+                        APP_ERROR_CHECK(err_code);
+                    }
+                    service_command_in_progress = false;
+                }
+                else
+                {
+                    // Ask for next bit position
+                    read_bit_counter = read_bit_counter + 1;
+                    err_code = app_sched_event_put(NULL, 0, execute_service_command);
+                    APP_ERROR_CHECK(err_code);
+                }
+            }
+            // Lower feedback flag
+            feedback_in_progress = false;
+        }
+        else
+        {
+            if (programming_track_state == MAIN)
+            {
+                value = main_value;
+            }
+            else if (programming_track_state == PROGRAMMING)
+            {
+                value = prog_value;
+            }
+            else
+            {
+                // We don't expect to be in MAIN_REPEAT, as feedback can't be started unless we have a DCC packet
+                APP_ERROR_CHECK(NRF_ERROR_INVALID_FLAGS);
+            }
+
+            // Record or compare to baseline
+            if (adc_baseline_flag)
+            {
+                adc_baseline = value;
+                adc_baseline_flag = false;
+                NRF_LOG_INFO("ADC result stored as baseline");
+            }
+            else
+            {
+                // Set acknowledge if the result was the required amount above the baseline
+                if (value > (adc_baseline + ADC_DELTA))
+                {
+                    acknowledge = true;
+                    NRF_LOG_INFO("ADC result %d higher than baseline %d + delta %d", value, adc_baseline, ADC_DELTA);
+                }
+            }
+        }
+    }
+
+    // Start the timer
+    err_code = app_timer_start(feedback_timer, APP_TIMER_TICKS(ADC_SAMPLE_INTERVAL_MS), NULL);
     APP_ERROR_CHECK(err_code);
 }
 
@@ -1773,21 +1764,17 @@ static void adc_init(void)
 {
     ret_code_t                 err_code;
     nrf_saadc_channel_config_t channel_config = NRF_DRV_SAADC_DEFAULT_CHANNEL_CONFIG_SE(MAIN_I_SENSE_INPUT);
+    nrf_saadc_value_t          value;
     channel_config.gain = NRF_SAADC_GAIN1_3;
 
-    err_code = nrf_drv_saadc_init(NULL, saadc_event_handler);
+    err_code = nrf_drv_saadc_init(NULL, dummy_saadc_event_handler);
     APP_ERROR_CHECK(err_code);
 
     err_code = nrf_drv_saadc_channel_init(MAIN_I_SENSE_CHANNEL, &channel_config);
     APP_ERROR_CHECK(err_code);
-    nrf_drv_saadc_limits_set(MAIN_I_SENSE_CHANNEL, NRF_DRV_SAADC_LIMITL_DISABLED, ADC_LIMIT);
     
     channel_config.pin_p = PROG_I_SENSE_INPUT;
     err_code = nrf_drv_saadc_channel_init(PROG_I_SENSE_CHANNEL, &channel_config);
-    APP_ERROR_CHECK(err_code);
-    nrf_drv_saadc_limits_set(PROG_I_SENSE_CHANNEL, NRF_DRV_SAADC_LIMITL_DISABLED, ADC_LIMIT);
-
-    err_code = nrfx_saadc_buffer_convert(adc_buffer, ADC_BUFFER_SIZE);
     APP_ERROR_CHECK(err_code);
 }
 
@@ -2303,10 +2290,6 @@ static void safety_init(void)
     {
         disable_DCC(ERROR_CODE_OVERTEMPERATURE);
     }
-
-    // Start the ADC
-    err_code = nrfx_saadc_sample();
-    APP_ERROR_CHECK(err_code);
 }
 
 
