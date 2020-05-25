@@ -123,6 +123,7 @@
     <configuration
       Name="Release"
       debug_additional_load_file="../../../../../../components/softdevice/s112/hex/s112_nrf52_7.0.1_softdevice.hex" />
+    <configuration Name="Debug" gcc_optimization_level="Level 2 for size" />
   </project>
   <configuration
     Name="Release"

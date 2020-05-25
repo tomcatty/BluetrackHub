@@ -1280,7 +1280,9 @@ void timer_dcc_data_event_handler(nrf_timer_event_t event_type, void* p_context)
         else
         {
             // There is nothing to send in any of the packet sources
+#ifdef DEBUG
             NRF_LOG_INFO("All buffers empty, counter: %d", counter);
+#endif
             counter = counter + 1;
 
             // We're guaranteed to have an empty buffer, so execute a service command, if one is pending
@@ -1437,13 +1439,21 @@ static void feedback_timer_timeout_handler(void *p_context)
     err_code = nrf_drv_saadc_sample_convert(PROG_I_SENSE_CHANNEL, &prog_value);
     APP_ERROR_CHECK(err_code);
 
+#ifdef DEBUG
     NRF_LOG_INFO("Main value: %d, Prog value: %d", main_value, prog_value);
+#endif
 
-    if ((main_value >= ADC_LIMIT) || (prog_value >= ADC_LIMIT))
+    if (main_value >= ADC_LIMIT)
     {
-        NRF_LOG_INFO("Overcurrent error");
+        NRF_LOG_INFO("Main overcurrent error");
         // Disable DCC
-        disable_DCC(ERROR_CODE_OVERCURRENT);
+        disable_DCC(ERROR_CODE_MAIN_OVERCURRENT);
+    }
+    else if (prog_value >= ADC_LIMIT)
+    {
+        NRF_LOG_INFO("Programming overcurrent error");
+        // Disable DCC
+        disable_DCC(ERROR_CODE_PROG_OVERCURRENT);
     }
 
     if (feedback_in_progress)
@@ -1518,10 +1528,12 @@ static void feedback_timer_timeout_handler(void *p_context)
             if (programming_track_state == MAIN)
             {
                 value = main_value;
+                NRF_LOG_INFO("Feedback in progress, main value: %d", main_value);
             }
             else if (programming_track_state == PROGRAMMING)
             {
                 value = prog_value;
+                NRF_LOG_INFO("Feedback in progress, prog value: %d", prog_value);
             }
             else
             {

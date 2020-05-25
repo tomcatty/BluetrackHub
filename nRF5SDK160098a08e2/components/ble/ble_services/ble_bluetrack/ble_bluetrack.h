@@ -79,7 +79,8 @@ NRF_SDH_BLE_OBSERVER(_name ## _obs,                                             
 
 #define ERROR_CODE_MAX_TRAIN_EXCEEDED 1
 #define ERROR_CODE_OVERTEMPERATURE 2
-#define ERROR_CODE_OVERCURRENT 3
+#define ERROR_CODE_MAIN_OVERCURRENT 3
+#define ERROR_CODE_PROG_OVERCURRENT 4
 
 // Forward declaration of the ble_bluetrack_t type. 
 typedef struct ble_bluetrack_s ble_bluetrack_t;
