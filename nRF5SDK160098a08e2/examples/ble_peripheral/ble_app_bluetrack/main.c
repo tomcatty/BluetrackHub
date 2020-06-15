@@ -106,14 +106,14 @@
 
 #define ADC_SAMPLE_INTERVAL_MS          0.5                                         /**< ADC sample interval (ms) (this allows at least 10 samples during a minimum 5ms feedback window, see S-9.2.3) */
 
-#define FUNCTION_READ_BIT               1                                           /**< Enum for read_bit function */
-#define FUNCTION_READ_BYTE              2                                           /**< Enum for read_byte function */
-#define FUNCTION_WRITE_BIT              3                                           /**< Enum for write_bit function */
-#define FUNCTION_WRITE_BYTE             4                                           /**< Enum for write_byte function */
-#define MODE_DIRECT                     1                                           /**< Enum for direct mode */
-#define MODE_PAGED                      2                                           /**< Enum for paged mode */
-#define MODE_REGISTER                   3                                           /**< Enum for register mode */
-#define MODE_ADDRESS                    4                                           /**< Enum for address mode */
+#define FUNCTION_READ_BIT               0                                           /**< Enum for read_bit function */
+#define FUNCTION_READ_BYTE              1                                           /**< Enum for read_byte function */
+#define FUNCTION_WRITE_BIT              2                                           /**< Enum for write_bit function */
+#define FUNCTION_WRITE_BYTE             3                                           /**< Enum for write_byte function */
+#define MODE_DIRECT                     0                                           /**< Enum for direct mode */
+#define MODE_PAGED                      1                                           /**< Enum for paged mode */
+#define MODE_REGISTER                   2                                           /**< Enum for register mode */
+#define MODE_ADDRESS                    3                                           /**< Enum for address mode */
 #define READ_BYTE_COUNTER_MAX           255                                         /**< Maximum value for the read byte counter (maximum value of 8 bit unsigned integer) */
 #define READ_BIT_COUNTER_MAX            7                                           /**< Maximum value for the read bit counter (8-1) */
 #define READ_BIT_COUNTER_MAX_ADDRESS    127                                         /**< Maximum value for the read byte counter when in address mode (short address cannot be greater than 127) */
@@ -692,7 +692,7 @@ static void stop_write_handler(ble_bluetrack_t * p_bluetrack, uint8_t stop)
  */
 static void service_command_write_handler(ble_bluetrack_t * p_bluetrack, uint8_t function_local, uint8_t mode_local, uint8_t CV_or_reg_upper_local, uint8_t CV_or_reg_lower_local, uint8_t value_local)
 {
-    NRF_LOG_INFO("Service Command Written");
+    NRF_LOG_INFO("Service Command Written, function_local = %d, mode_local = %d, CV_or_reg_upper_local = %d, CV_or_reg_lower_local = %d, value_local = %d", function_local, mode_local, CV_or_reg_upper_local, CV_or_reg_lower_local, value_local);
 
     if (!service_command_pending && !service_command_in_progress)
     {
@@ -713,6 +713,7 @@ static void service_command_write_handler(ble_bluetrack_t * p_bluetrack, uint8_t
             (mode == MODE_DIRECT || mode == MODE_ADDRESS || mode == MODE_PAGED || mode == MODE_REGISTER) &&
             ((function != FUNCTION_READ_BIT && function != FUNCTION_WRITE_BIT) || ((function == FUNCTION_READ_BIT || function == FUNCTION_WRITE_BIT) && (mode == MODE_DIRECT))))
         {
+            NRF_LOG_INFO("service_command_pending Raised");
             service_command_pending = true;
         }
     }
