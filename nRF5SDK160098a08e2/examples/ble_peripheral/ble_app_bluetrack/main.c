@@ -1449,7 +1449,14 @@ static void feedback_timer_timeout_handler(void *p_context)
     NRF_LOG_INFO("Main value: %d, Prog value: %d", main_value, prog_value);
 #endif
 
-    if (main_value >= ADC_LIMIT)
+
+    if ((main_value >= ADC_LIMIT) && (prog_value >= ADC_LIMIT))
+    {
+        NRF_LOG_INFO("Main and programming overcurrent error");
+        // Disable DCC
+        disable_DCC(ERROR_CODE_MAIN_AND_PROG_OVERCURRENT);
+    }
+    else if (main_value >= ADC_LIMIT)
     {
         NRF_LOG_INFO("Main overcurrent error");
         // Disable DCC
@@ -1460,6 +1467,12 @@ static void feedback_timer_timeout_handler(void *p_context)
         NRF_LOG_INFO("Programming overcurrent error");
         // Disable DCC
         disable_DCC(ERROR_CODE_PROG_OVERCURRENT);
+    }
+    else if ((main_value + prog_value) >= ADC_LIMIT)
+    {
+        NRF_LOG_INFO("Sum of main and programming overcurrent error");
+        // Disable DCC
+        disable_DCC(ERROR_CODE_SUM_MAIN_AND_PROG_OVERCURRENT);
     }
 
     if (feedback_in_progress)

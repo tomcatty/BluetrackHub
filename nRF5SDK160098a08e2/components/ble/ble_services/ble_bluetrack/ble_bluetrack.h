@@ -18,24 +18,6 @@
  * @brief BlueTrack Service module.
  *
  * @details This module implements the BlueTrack Service.
- *          During initialization it adds the BlueTrack Service, Address Characteristic, DCC Command Characteristic,
- *          Programming Track Select Characteristic, Stop Characteristic, 
- *          and Acknowledge Characteristic to the BLE stack database.
- *
- *          If an Address Write handler is supplied by the application, the BlueTrack Service will
- *          call this handler when the Address Characteristic is written to.
- *
- *          If a DCC Command Write handler is supplied by the application, the BlueTrack Service will
- *          call this handler when the DCC Command Characteristic is written to.
- *
- *          If a Programming Track Select Write handler is supplied by the application, the BlueTrack Service will
- *          call this handler when the Programming Track Select Characteristic is written to.
- *
- *          If a Stop Write handler is supplied by the application, the BlueTrack Service will
- *          call this handler when the Stop Characteristic is written to.
- *
- * @note The application must propagate BLE stack events to the BlueTrack Service module by calling
- *       ble_bluetrack_on_ble_evt() from the from the @ref ble_stack_handler callback.
  */
 
 #ifndef BLE_BLUETRACK_H__
@@ -81,6 +63,8 @@ NRF_SDH_BLE_OBSERVER(_name ## _obs,                                             
 #define ERROR_CODE_OVERTEMPERATURE 2
 #define ERROR_CODE_MAIN_OVERCURRENT 3
 #define ERROR_CODE_PROG_OVERCURRENT 4
+#define ERROR_CODE_MAIN_AND_PROG_OVERCURRENT 5
+#define ERROR_CODE_SUM_MAIN_AND_PROG_OVERCURRENT 6
 
 // Forward declaration of the ble_bluetrack_t type. 
 typedef struct ble_bluetrack_s ble_bluetrack_t;
