@@ -247,7 +247,7 @@ static uint8_t                          function;                               
 static uint8_t                          mode;                                                     /**< Mode of the service command pending/in progress */
 static uint8_t                          CV_or_reg_upper;                                          /**< Upper portion of CV or register of the service command pending/in progress */
 static uint8_t                          CV_or_reg_lower;                                          /**< Lower portion of CV or register of the service command pending/in progress */
-static uint8_t                          value;                                                    /**< Value to be written of the service command pending/in progress */
+static uint8_t                          service_command_value;                                                    /**< Value to be written of the service command pending/in progress */
 static uint16_t                         read_byte_counter;                                        /**< Read byte counter of the service command pending/in progress */
 static uint8_t                          read_bit_counter;                                         /**< Read bit counter of the service command pending/in progress */
 static uint8_t                          read_bit_value;                                           /**< Read bit response of the service command pending/in progress */
@@ -706,7 +706,7 @@ static void service_command_write_handler(ble_bluetrack_t * p_bluetrack, uint8_t
         mode = mode_local;
         CV_or_reg_upper = CV_or_reg_upper_local;
         CV_or_reg_lower = CV_or_reg_lower_local;
-        value = value_local;
+        service_command_value = value_local;
         
         // Raise pending flag only if parameters are valid
         if ((function == FUNCTION_READ_BIT || function == FUNCTION_READ_BYTE || function == FUNCTION_WRITE_BIT || function == FUNCTION_WRITE_BYTE) &&
@@ -763,7 +763,7 @@ void execute_service_command (void *p_event_data, uint16_t event_size)
                 // We are sending a CV address, so only extract the lower two bits from the upper byte
                 byte1 = 0x7C | (CV_or_reg_upper & 0x03);
                 byte2 = CV_or_reg_lower;
-                byte3 = value;
+                byte3 = service_command_value;
                 
                 // 5 write packets
                 enqueue_dcc_command(byte1, byte2, byte3, 0, 0, 3, 1, NULL);
@@ -807,7 +807,7 @@ void execute_service_command (void *p_event_data, uint16_t event_size)
                 
                 byte1 = 0x78;
                 // Ensure the address to be written is <= 127 (S-9.2.2 CV 1)
-                byte2 = value & 0x7F;
+                byte2 = service_command_value & 0x7F;
                 
                 // 5 write packets
                 enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 1, NULL);
@@ -851,7 +851,7 @@ void execute_service_command (void *p_event_data, uint16_t event_size)
                 
                 // For a register address, extract only the lower three bits from the lower byte
                 byte1 = 0x78 | (CV_or_reg_lower & 0x07);
-                byte2 = value;
+                byte2 = service_command_value;
                 
                 // 5 write packets
                 enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 1, NULL);
@@ -899,7 +899,7 @@ void execute_service_command (void *p_event_data, uint16_t event_size)
                 // Ensure CV is < 1024 before converting to register number
                 data_register = (CV_or_reg & 0x03FF) % 4;
                 byte1 = 0x78 | data_register;
-                byte2 = value;
+                byte2 = service_command_value;
                 
                 // 5 write packets
                 enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 1, NULL);
@@ -1050,7 +1050,7 @@ void execute_service_command (void *p_event_data, uint16_t event_size)
                 // Ensure CV is < 1024 before converting to register number
                 data_register = (CV_or_reg & 0x03FF) % 4;
                 byte1 = 0x70 | data_register;
-                byte2 = value;
+                byte2 = service_command_value;
                 
                 // 5 read packets
                 enqueue_dcc_command(byte1, byte2, 0, 0, 0, 2, 1, NULL);
@@ -1075,7 +1075,7 @@ void execute_service_command (void *p_event_data, uint16_t event_size)
                 byte1 = 0x78 | (CV_or_reg_upper & 0x03);
                 byte2 = CV_or_reg_lower;
                 // The lower 4 bits of value are the bit value to be written (bit 3) and the bit position (bits 2-0)
-                byte3 = 0xF0 | (value & 0x0F);
+                byte3 = 0xF0 | (service_command_value & 0x0F);
                 
                 // 5 write packets
                 enqueue_dcc_command(byte1, byte2, byte3, 0, 0, 3, 1, NULL);
@@ -1200,12 +1200,15 @@ void timer_dcc_data_event_handler(nrf_timer_event_t event_type, void* p_context)
         
         if (active_packet)
         {
-            // Clear the sync output
-            nrf_gpio_pin_clear(SYNC_PIN_NO);
+            // Clear the sync output, only if there is no feedback in progress (it will be cleared when the feedback window ends)
+            if (!feedback_in_progress)
+            {
+                nrf_drv_gpiote_out_clear(SYNC_PIN_NO);
+            }
             // Enable sync output if this is the first bit of this packet
             if (active_packet->sync)
             {
-                nrf_gpio_pin_set(SYNC_PIN_NO);
+                nrf_drv_gpiote_out_set(SYNC_PIN_NO);
                 active_packet->sync = false;
             }
 
@@ -1218,6 +1221,8 @@ void timer_dcc_data_event_handler(nrf_timer_event_t event_type, void* p_context)
                 adc_baseline_flag = true;
                 feedback_window_end = false;
                 acknowledge = false;
+                // Indicate on sync pin that a feedback window is in progress
+                nrf_drv_gpiote_out_set(SYNC_PIN_NO);
             }
             // Clear feedback flag, we do not want to check it again for this packet
             active_packet->feedback = false;
@@ -1466,13 +1471,14 @@ static void feedback_timer_timeout_handler(void *p_context)
             if (function == FUNCTION_WRITE_BYTE || function == FUNCTION_WRITE_BIT)
             {
                 // We are done now, transmit back result
-                err_code = ble_bluetrack_response_update(m_conn_handle, &m_bluetrack, acknowledge ? 0x01 : 0x00, value);
+                err_code = ble_bluetrack_response_update(m_conn_handle, &m_bluetrack, acknowledge ? 0x01 : 0x00, service_command_value);
                 if (err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
                     err_code != NRF_ERROR_INVALID_STATE && 
                     err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
                 {
                     APP_ERROR_CHECK(err_code);
                 }
+                NRF_LOG_INFO("Write byte/write bit of value %d complete, acknowledge = %d", service_command_value, acknowledge);
                 service_command_in_progress = false;
             }
             else if (function == FUNCTION_READ_BYTE)
@@ -1488,11 +1494,13 @@ static void feedback_timer_timeout_handler(void *p_context)
                     {
                         APP_ERROR_CHECK(err_code);
                     }
+                    NRF_LOG_INFO("Read byte complete, acknowledge = %d, value = %d", acknowledge, read_byte_counter);
                     service_command_in_progress = false;
                 }
                 else
                 {
                     // No response received, continue to try new values
+                    NRF_LOG_INFO("Read byte check value %d failed, now trying next value", read_byte_counter);
                     read_byte_counter = read_byte_counter + 1;
                     err_code = app_sched_event_put(NULL, 0, execute_service_command);
                     APP_ERROR_CHECK(err_code);
@@ -1511,11 +1519,13 @@ static void feedback_timer_timeout_handler(void *p_context)
                     {
                         APP_ERROR_CHECK(err_code);
                     }
+                    NRF_LOG_INFO("Read bits complete, value = %d", read_bit_value);
                     service_command_in_progress = false;
                 }
                 else
                 {
                     // Ask for next bit position
+                    NRF_LOG_INFO("Read bit %d as %d", read_bit_counter, acknowledge);
                     read_bit_counter = read_bit_counter + 1;
                     err_code = app_sched_event_put(NULL, 0, execute_service_command);
                     APP_ERROR_CHECK(err_code);
@@ -1523,6 +1533,8 @@ static void feedback_timer_timeout_handler(void *p_context)
             }
             // Lower feedback flag
             feedback_in_progress = false;
+            // Clear sync output
+            nrf_drv_gpiote_out_clear(SYNC_PIN_NO);
         }
         else
         {
