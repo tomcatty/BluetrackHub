@@ -254,6 +254,9 @@ void nrf_dfu_settings_reinit(void)
                         "backup are valid (CRC error).");
         memset(&s_dfu_settings, 0x00, sizeof(nrf_dfu_settings_t));
         s_dfu_settings.settings_version = NRF_DFU_SETTINGS_VERSION;
+#ifdef BLUETRACK
+        s_dfu_settings.bootloader_version = BOOTLOADER_VERSION;
+#endif
     }
 
     if (NRF_DFU_SETTINGS_COMPATIBILITY_MODE && !NRF_DFU_IN_APP && (s_dfu_settings.settings_version == 1))
