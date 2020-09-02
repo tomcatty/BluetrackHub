@@ -2,5 +2,5 @@
 
 *.jlink
 
-nRF5SDK160098a08e2/examples/ble_peripheral/ble_app_bluetrack/pca10040/s112/ses/ble_app_bluetrack_pca10040_s112.emSession
+*.emSession
 
