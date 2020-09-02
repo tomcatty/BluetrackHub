@@ -58,7 +58,7 @@
 
 #define MAIN_DCC_PIN_NO                 2
 #define MAIN_I_SENSE_PIN_NO             3
-#define BRAKE_N_PIN_NO                  4
+#define BRAKE_N_PIN_NO                  26
 #define RELAY_1_PIN_NO                  9
 #define RELAY_2_PIN_NO                  10
 #define RELAY_3_PIN_NO                  11
@@ -73,6 +73,7 @@
 #define RELAY_12_PIN_NO                 20
 #define RELAY_13_PIN_NO                 22
 #define RELAY_14_PIN_NO                 23
+#define RELAY_15_PIN_NO                 21
 #define SYNC_PIN_NO                     24
 #define STOP_LED_PIN_NO                 25
 #define PROG_I_SENSE_PIN                26
@@ -83,14 +84,13 @@
 #define PROG_LED_PIN_NO                 31
 
 #define MAIN_I_SENSE_INPUT              NRF_SAADC_INPUT_AIN1
-// TODO fix this once pin is remapped
-#define PROG_I_SENSE_INPUT              NRF_SAADC_INPUT_DISABLED
+#define PROG_I_SENSE_INPUT              NRF_SAADC_INPUT_AIN2
 #define MAIN_I_SENSE_CHANNEL            0                                           /**< ADC channel used for MAIN current sense, this is also the index for the result in adc_buffer */
 #define PROG_I_SENSE_CHANNEL            1                                           /**< ADC channel used for PROG current sense, this is also the index for the result in adc_buffer */
 #define ADC_LIMIT                       14254                                       /**< Corresponds to 3A for minimum sensitivity and 2A for maximum sensitivity */
 #define ADC_DELTA                       285                                         /**< ADC value above the baseline required to trigger an acknowledge, corresponds to 60mA for minimum sensitivity and 40mA for maximum sensitivity */
 
-#define N_OUTPUTS                       14                                          /**< 14 Relay Outputs in total */
+#define N_OUTPUTS                       15                                          /**< 15 Relay Outputs in total */
 
 #define DCC_ONE_TIME_US                 58                                          /**< 58us (see S-9.1) */
 #define DCC_ZERO_TIME_US                100                                         /**< 100us (see S-9.1) */
@@ -142,8 +142,8 @@
 #define APP_ADV_INTERVAL                MSEC_TO_UNITS(20, UNIT_0_625_MS )          /**< The advertising interval, 20ms recommended by R12 of Accessory Design Guidelines for Apple Devices */
 #define APP_ADV_DURATION                BLE_GAP_ADV_TIMEOUT_GENERAL_UNLIMITED      /**< Advertising duration in 10 ms units. */
 
-#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(510, UNIT_1_25_MS)            /**< Minimum acceptable connection interval (0.51 seconds to comply with R12 of Accessory Design Guidelines for Apple Devices). */
-#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(1000, UNIT_1_25_MS)           /**< Maximum acceptable connection interval (1 second). */
+#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(45, UNIT_1_25_MS)             /**< Minimum acceptable connection interval, needed for responsiveness (45ms complies with R12 of Accessory Design Guidelines for Apple Devices). */
+#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(100, UNIT_1_25_MS)            /**< Maximum acceptable connection interval, needed for responsiveness. */
 #define SLAVE_LATENCY                   0                                           /**< Slave latency (0 to comply with R12 of Accessory Design Guidelines for Apple Devices). */
 #define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(4000, UNIT_10_MS)             /**< Connection supervisory timeout (4 seconds to comply with R12 of Accessory Design Guidelines for Apple Devices). */
 
@@ -226,7 +226,8 @@ static nrf_drv_gpiote_pin_t             output_pin[N_OUTPUTS] = {RELAY_1_PIN_NO,
                                                                  RELAY_11_PIN_NO,
                                                                  RELAY_12_PIN_NO,
                                                                  RELAY_13_PIN_NO,
-                                                                 RELAY_14_PIN_NO};
+                                                                 RELAY_14_PIN_NO,
+                                                                 RELAY_15_PIN_NO};
 static bool                             output_flags[N_OUTPUTS];                                  /**< Flags for requesting relay activation */
 static dcc_command_t                    dcc_command_buffer[DCC_COMMAND_BUFFER_SIZE];              /**< DCC command buffer that stores pending commands */
 static uint8_t                          producer_index;                                           /**< Index of the next available DCC command buffer slot that can be filled */
