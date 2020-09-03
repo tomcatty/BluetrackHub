@@ -274,13 +274,13 @@ static ret_code_t response_send(uint8_t * p_buf, uint16_t len)
 }
 
 
-#if (NRF_DFU_BLE_REQUIRES_BONDS)
+#if (NRF_DFU_BLE_REQUIRES_BONDS) || (BLUETRACK)
 static uint32_t service_changed_send(void)
 {
     uint32_t err_code;
 
     NRF_LOG_DEBUG("Sending Service Changed indication");
-
+#if !(BLUETRACK)
     err_code = sd_ble_gatts_sys_attr_set(m_conn_handle,
                                          m_peer_data.sys_serv_attr,
                                          sizeof(m_peer_data.sys_serv_attr),
@@ -292,9 +292,9 @@ static uint32_t service_changed_send(void)
                                          0,
                                          BLE_GATTS_SYS_ATTR_FLAG_USR_SRVCS);
     VERIFY_SUCCESS(err_code);
-
+#endif
     err_code = sd_ble_gatts_service_changed(m_conn_handle, m_dfu.service_handle, 0xFFFF);
-
+#if !(BLUETRACK)
     if (   (err_code == BLE_ERROR_INVALID_CONN_HANDLE)
         || (err_code == NRF_ERROR_INVALID_STATE)
         || (err_code == NRF_ERROR_BUSY))
@@ -305,7 +305,7 @@ static uint32_t service_changed_send(void)
                         "Error: 0x%08x", err_code);
         err_code = NRF_SUCCESS;
     }
-
+#endif
     return err_code;
 }
 #endif
@@ -637,7 +637,10 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 {
     uint32_t                    err_code;
     ble_gap_evt_t const * const p_gap = &p_ble_evt->evt.gap_evt;
-
+#if (BLUETRACK)
+    ble_gatts_evt_write_t const *p_evt_write;
+    uint8_t const *             data;
+#endif
     switch (p_ble_evt->header.evt_id)
     {
         case BLE_GAP_EVT_CONNECTED:
@@ -677,6 +680,18 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 
         case BLE_GATTS_EVT_WRITE:
         {
+#if (BLUETRACK)
+            // Check if the Service Changed CCCD has been written to
+            p_evt_write = &p_ble_evt->evt.gatts_evt.params.write;
+            data = p_evt_write->data;
+            // Empirically, Service Changed CCCD has handle 0xD, and is always Indicated (value is 0x2)
+            // Note data is little endian
+            if((p_evt_write->handle == 0xD) && (p_evt_write->len == 2) && (data[0] == 0x2)) {
+                NRF_LOG_INFO("Service Changed ready to indicate, indicating now");
+                err_code = service_changed_send();
+                APP_ERROR_CHECK(err_code);
+            }
+#endif
             on_write(&m_dfu, p_ble_evt);
         } break;
 
