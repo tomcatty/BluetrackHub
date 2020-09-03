@@ -60,6 +60,12 @@
 #include "app_error_weak.h"
 #include "nrf_bootloader_info.h"
 #include "nrf_delay.h"
+#include "nrf_drv_gpiote.h"
+
+#define STOP_LED_PIN_NO                 25
+#define ERROR_LED_PIN_NO                29
+#define BLE_LED_PIN_NO                  30
+#define PROG_LED_PIN_NO                 31
 
 static void on_error(void)
 {
@@ -96,6 +102,33 @@ void app_error_handler_bare(uint32_t error_code)
     on_error();
 }
 
+/**@brief Function for initialising the GPIOTE module.
+ */
+static void gpiote_init(void)
+{
+    ret_code_t                  err_code;  
+    nrf_drv_gpiote_out_config_t config_out_simple_false = GPIOTE_CONFIG_OUT_SIMPLE(false);
+
+    err_code = nrf_drv_gpiote_init();
+    APP_ERROR_CHECK(err_code);   
+
+    // Initialise stop LED (start off) - under CPU control
+    err_code = nrf_drv_gpiote_out_init(STOP_LED_PIN_NO, &config_out_simple_false);
+    APP_ERROR_CHECK(err_code);   
+
+    // Initialise error LED (start off) - under CPU control
+    err_code = nrf_drv_gpiote_out_init(ERROR_LED_PIN_NO, &config_out_simple_false);
+    APP_ERROR_CHECK(err_code);
+
+    // Initialise BLE LED (start off) - under CPU control
+    err_code = nrf_drv_gpiote_out_init(BLE_LED_PIN_NO, &config_out_simple_false);
+    APP_ERROR_CHECK(err_code);
+
+    // Initialise programming LED (start off) - under CPU control
+    err_code = nrf_drv_gpiote_out_init(PROG_LED_PIN_NO, &config_out_simple_false);
+    APP_ERROR_CHECK(err_code);
+}
+
 /**
  * @brief Function notifies certain events in DFU process.
  */
@@ -103,19 +136,32 @@ static void dfu_observer(nrf_dfu_evt_type_t evt_type)
 {
     switch (evt_type)
     {
-        case NRF_DFU_EVT_DFU_FAILED:
-        case NRF_DFU_EVT_DFU_ABORTED:
-        case NRF_DFU_EVT_DFU_INITIALIZED:
-            bsp_board_init(BSP_INIT_LEDS);
-            bsp_board_led_on(BSP_BOARD_LED_0);
-            bsp_board_led_on(BSP_BOARD_LED_1);
-            bsp_board_led_off(BSP_BOARD_LED_2);
+        case NRF_DFU_EVT_DFU_INITIALIZED:        /**< Starting DFU. */
+            gpiote_init();
+            nrf_drv_gpiote_out_set(PROG_LED_PIN_NO);
+            nrf_drv_gpiote_out_set(STOP_LED_PIN_NO);
             break;
-        case NRF_DFU_EVT_TRANSPORT_ACTIVATED:
-            bsp_board_led_off(BSP_BOARD_LED_1);
-            bsp_board_led_on(BSP_BOARD_LED_2);
+        case NRF_DFU_EVT_TRANSPORT_ACTIVATED:    /**< Transport activated (e.g. BLE connected, USB plugged in). */
+            nrf_drv_gpiote_out_set(BLE_LED_PIN_NO);
             break;
-        case NRF_DFU_EVT_DFU_STARTED:
+        case NRF_DFU_EVT_TRANSPORT_DEACTIVATED:  /**< Transport deactivated (e.g. BLE disconnected, USB plugged out). */
+            nrf_drv_gpiote_out_clear(BLE_LED_PIN_NO);
+            break;
+        case NRF_DFU_EVT_DFU_STARTED:            /**< DFU process started. */
+            nrf_drv_gpiote_out_clear(STOP_LED_PIN_NO);
+            nrf_drv_gpiote_out_clear(ERROR_LED_PIN_NO);
+            break;
+        case NRF_DFU_EVT_OBJECT_RECEIVED:        /**< A DFU data object has been received. */
+            nrf_drv_gpiote_out_toggle(STOP_LED_PIN_NO);
+            break;
+        case NRF_DFU_EVT_DFU_FAILED:             /**< DFU process has failed, been interrupted, or hung. */
+            nrf_drv_gpiote_out_set(ERROR_LED_PIN_NO);
+            break;
+        case NRF_DFU_EVT_DFU_COMPLETED:          /**< DFU process completed. */
+            nrf_drv_gpiote_out_set(STOP_LED_PIN_NO);
+            break;
+        case NRF_DFU_EVT_DFU_ABORTED:            /**< DFU process aborted. */
+            nrf_drv_gpiote_out_set(STOP_LED_PIN_NO);
             break;
         default:
             break;
