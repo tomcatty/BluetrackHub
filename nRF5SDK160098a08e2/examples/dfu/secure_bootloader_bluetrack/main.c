@@ -60,7 +60,7 @@
 #include "app_error_weak.h"
 #include "nrf_bootloader_info.h"
 #include "nrf_delay.h"
-#include "nrf_drv_gpiote.h"
+#include "nrf_gpio.h"
 
 #define STOP_LED_PIN_NO                 25
 #define ERROR_LED_PIN_NO                29
@@ -104,29 +104,23 @@ void app_error_handler_bare(uint32_t error_code)
 
 /**@brief Function for initialising the GPIOTE module.
  */
-static void gpiote_init(void)
+static void gpio_init(void)
 {
-    ret_code_t                  err_code;  
-    nrf_drv_gpiote_out_config_t config_out_simple_false = GPIOTE_CONFIG_OUT_SIMPLE(false);
-
-    err_code = nrf_drv_gpiote_init();
-    APP_ERROR_CHECK(err_code);   
-
     // Initialise stop LED (start off) - under CPU control
-    err_code = nrf_drv_gpiote_out_init(STOP_LED_PIN_NO, &config_out_simple_false);
-    APP_ERROR_CHECK(err_code);   
+    nrf_gpio_cfg_output(STOP_LED_PIN_NO);
+    nrf_gpio_pin_clear(STOP_LED_PIN_NO);
 
     // Initialise error LED (start off) - under CPU control
-    err_code = nrf_drv_gpiote_out_init(ERROR_LED_PIN_NO, &config_out_simple_false);
-    APP_ERROR_CHECK(err_code);
+    nrf_gpio_cfg_output(ERROR_LED_PIN_NO);
+    nrf_gpio_pin_clear(ERROR_LED_PIN_NO);
 
     // Initialise BLE LED (start off) - under CPU control
-    err_code = nrf_drv_gpiote_out_init(BLE_LED_PIN_NO, &config_out_simple_false);
-    APP_ERROR_CHECK(err_code);
+    nrf_gpio_cfg_output(BLE_LED_PIN_NO);
+    nrf_gpio_pin_clear(BLE_LED_PIN_NO);
 
     // Initialise programming LED (start off) - under CPU control
-    err_code = nrf_drv_gpiote_out_init(PROG_LED_PIN_NO, &config_out_simple_false);
-    APP_ERROR_CHECK(err_code);
+    nrf_gpio_cfg_output(PROG_LED_PIN_NO);
+    nrf_gpio_pin_clear(PROG_LED_PIN_NO);
 }
 
 /**
@@ -137,31 +131,31 @@ static void dfu_observer(nrf_dfu_evt_type_t evt_type)
     switch (evt_type)
     {
         case NRF_DFU_EVT_DFU_INITIALIZED:        /**< Starting DFU. */
-            gpiote_init();
-            nrf_drv_gpiote_out_set(PROG_LED_PIN_NO);
-            nrf_drv_gpiote_out_set(STOP_LED_PIN_NO);
+            gpio_init();
+            nrf_gpio_pin_set(PROG_LED_PIN_NO);
+            nrf_gpio_pin_set(STOP_LED_PIN_NO);
             break;
         case NRF_DFU_EVT_TRANSPORT_ACTIVATED:    /**< Transport activated (e.g. BLE connected, USB plugged in). */
-            nrf_drv_gpiote_out_set(BLE_LED_PIN_NO);
+            nrf_gpio_pin_set(BLE_LED_PIN_NO);
             break;
         case NRF_DFU_EVT_TRANSPORT_DEACTIVATED:  /**< Transport deactivated (e.g. BLE disconnected, USB plugged out). */
-            nrf_drv_gpiote_out_clear(BLE_LED_PIN_NO);
+            nrf_gpio_pin_clear(BLE_LED_PIN_NO);
             break;
         case NRF_DFU_EVT_DFU_STARTED:            /**< DFU process started. */
-            nrf_drv_gpiote_out_clear(STOP_LED_PIN_NO);
-            nrf_drv_gpiote_out_clear(ERROR_LED_PIN_NO);
+            nrf_gpio_pin_clear(STOP_LED_PIN_NO);
+            nrf_gpio_pin_clear(ERROR_LED_PIN_NO);
             break;
         case NRF_DFU_EVT_OBJECT_RECEIVED:        /**< A DFU data object has been received. */
-            nrf_drv_gpiote_out_toggle(STOP_LED_PIN_NO);
+            nrf_gpio_pin_toggle(STOP_LED_PIN_NO);
             break;
         case NRF_DFU_EVT_DFU_FAILED:             /**< DFU process has failed, been interrupted, or hung. */
-            nrf_drv_gpiote_out_set(ERROR_LED_PIN_NO);
+            nrf_gpio_pin_set(ERROR_LED_PIN_NO);
             break;
         case NRF_DFU_EVT_DFU_COMPLETED:          /**< DFU process completed. */
-            nrf_drv_gpiote_out_set(STOP_LED_PIN_NO);
+            nrf_gpio_pin_set(STOP_LED_PIN_NO);
             break;
         case NRF_DFU_EVT_DFU_ABORTED:            /**< DFU process aborted. */
-            nrf_drv_gpiote_out_set(STOP_LED_PIN_NO);
+            nrf_gpio_pin_set(STOP_LED_PIN_NO);
             break;
         default:
             break;
