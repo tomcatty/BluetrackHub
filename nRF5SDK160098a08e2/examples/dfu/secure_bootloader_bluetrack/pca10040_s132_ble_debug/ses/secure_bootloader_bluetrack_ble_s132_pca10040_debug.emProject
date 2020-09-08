@@ -1,9 +1,9 @@
 <!DOCTYPE CrossStudio_Project_File>
 <solution
-  Name="secure_bootloader_ble_s132_pca10040_debug"
+  Name="secure_bootloader_bluetrack_ble_s132_pca10040_debug"
   target="8"
   version="2">
-  <project Name="secure_bootloader_ble_s132_pca10040_debug">
+  <project Name="secure_bootloader_bluetrack_ble_s132_pca10040_debug">
     <configuration
       Name="Common"
       arm_architecture="v7EM"
