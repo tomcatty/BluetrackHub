@@ -909,7 +909,7 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 }
 
 
-#if (!NRF_DFU_BLE_REQUIRES_BONDS)
+#if (!NRF_DFU_BLE_REQUIRES_BONDS) && (!BLUETRACK)
 static uint32_t gap_address_change(void)
 {
     uint32_t       err_code;
@@ -944,10 +944,10 @@ static uint32_t gap_params_init(void)
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&sec_mode);
 
 #if (!NRF_DFU_BLE_REQUIRES_BONDS)
-
+#if (!BLUETRACK)
     err_code = gap_address_change();
     VERIFY_SUCCESS(err_code);
-
+#endif
     if ((m_flags & DFU_BLE_FLAG_USE_ADV_NAME) != 0)
     {
         NRF_LOG_DEBUG("Setting adv name: %s, length: %d", m_adv_name.name, m_adv_name.len);
