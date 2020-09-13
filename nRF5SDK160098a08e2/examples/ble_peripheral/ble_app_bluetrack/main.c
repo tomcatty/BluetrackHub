@@ -47,6 +47,7 @@
 #include "nrf_drv_timer.h"
 #include "nrf_drv_ppi.h"
 #include "nrf_drv_saadc.h"
+#include "nrf_dfu_types.h"
 
 #include "nrf_log.h"
 #include "nrf_log_ctrl.h"
@@ -55,6 +56,8 @@
 #include "gatts_cache_manager.h"
 
 #define DREKKER_DEVELOPMENT_COMPANY_ID  0x0343                                      /**< Assigned by Bluetooth SIG. */            
+
+#define BOOTLOADER_SETTINGS_PAGE_ADDR   0x0007F000
 
 #define MAIN_DCC_PIN_NO                 2
 #define MAIN_I_SENSE_PIN_NO             3
@@ -1966,8 +1969,9 @@ static void advertising_init(void)
     uint32_t                 firmware_version;
     ble_uuid_t adv_uuids[] = {{BLUETRACK_UUID_SERVICE, m_bluetrack.uuid_type}};
 
-    // Retrieve firmware version from UICR, CUSTOMER[0] stores the application version. */
-    firmware_version = NRF_UICR->CUSTOMER[0];
+    // Retrieve firmware version from bootloader settings page
+    nrf_dfu_settings_t *p_settings = (nrf_dfu_settings_t*)BOOTLOADER_SETTINGS_PAGE_ADDR;
+    firmware_version = p_settings->app_version;
     
     // Construct manufacturing data
     manuf_data.company_identifier = DREKKER_DEVELOPMENT_COMPANY_ID;
