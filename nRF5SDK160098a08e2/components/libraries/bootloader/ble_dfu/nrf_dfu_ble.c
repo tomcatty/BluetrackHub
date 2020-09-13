@@ -146,6 +146,9 @@ static uint32_t advertising_init(uint8_t adv_flags, ble_gap_adv_params_t const *
 
     /* This needs to be static because of SoftDevice API requirements. */
     static uint8_t m_enc_advdata[BLE_GAP_ADV_SET_DATA_SIZE_MAX];
+#ifdef BLUETRACK
+    static uint8_t m_enc_scan_rsp_data[BLE_GAP_ADV_SET_DATA_SIZE_MAX];
+#endif
 
     ble_gap_adv_data_t m_adv_data =
     {
@@ -153,7 +156,16 @@ static uint32_t advertising_init(uint8_t adv_flags, ble_gap_adv_params_t const *
         {
             .p_data = m_enc_advdata,
             .len    = APP_ADV_DATA_HEADER_SIZE,
+#ifdef BLUETRACK
+        },
+        .scan_rsp_data =
+        {
+             .p_data = m_enc_scan_rsp_data,
+             .len    = 18UL,
         }
+#else
+        }
+#endif
     };
 
     /* Encode flags. */
@@ -179,6 +191,27 @@ static uint32_t advertising_init(uint8_t adv_flags, ble_gap_adv_params_t const *
     m_enc_advdata[8] = BLE_GAP_AD_TYPE_COMPLETE_LOCAL_NAME;
 
     m_adv_data.adv_data.len += actual_device_name_length;
+#ifdef BLUETRACK
+    // Encode manufacturer data in scan reponse
+    m_enc_scan_rsp_data[0] = 17UL;
+    m_enc_scan_rsp_data[1] = BLE_GAP_AD_TYPE_MANUFACTURER_SPECIFIC_DATA;
+    m_enc_scan_rsp_data[2] = 0x43;
+    m_enc_scan_rsp_data[3] = 0x03;
+    m_enc_scan_rsp_data[4] = (uint8_t) ((NRF_UICR->CUSTOMER[0] & 0x000000FF) >> 0);
+    m_enc_scan_rsp_data[5] = (uint8_t) ((NRF_UICR->CUSTOMER[0] & 0x0000FF00) >> 8);
+    m_enc_scan_rsp_data[6] = (uint8_t) ((NRF_UICR->CUSTOMER[0] & 0x00FF0000) >> 16);
+    m_enc_scan_rsp_data[7] = (uint8_t) ((NRF_UICR->CUSTOMER[0] & 0xFF000000) >> 24);
+    m_enc_scan_rsp_data[8] = (uint8_t) ((SD_OFFSET_GET_UINT16(MBR_SIZE,0x0C) & 0x00FF) >> 0);
+    m_enc_scan_rsp_data[9] = (uint8_t) ((SD_OFFSET_GET_UINT16(MBR_SIZE,0x0C) & 0xFF00) >> 8);
+    m_enc_scan_rsp_data[10] = (uint8_t) ((s_dfu_settings.bootloader_version & 0x000000FF) >> 0);
+    m_enc_scan_rsp_data[11] = (uint8_t) ((s_dfu_settings.bootloader_version & 0x0000FF00) >> 8);
+    m_enc_scan_rsp_data[12] = (uint8_t) ((s_dfu_settings.bootloader_version & 0x00FF0000) >> 16);
+    m_enc_scan_rsp_data[13] = (uint8_t) ((s_dfu_settings.bootloader_version & 0xFF000000) >> 24);
+    m_enc_scan_rsp_data[14] = (uint8_t) ((s_dfu_settings.app_version & 0x000000FF) >> 0);
+    m_enc_scan_rsp_data[15] = (uint8_t) ((s_dfu_settings.app_version & 0x0000FF00) >> 8);
+    m_enc_scan_rsp_data[16] = (uint8_t) ((s_dfu_settings.app_version & 0x00FF0000) >> 16);
+    m_enc_scan_rsp_data[17] = (uint8_t) ((s_dfu_settings.app_version & 0xFF000000) >> 24);
+#endif
 
     return sd_ble_gap_adv_set_configure(&m_adv_handle, &m_adv_data, p_adv_params);
 }

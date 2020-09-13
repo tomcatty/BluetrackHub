@@ -60,4 +60,7 @@
   <MemorySegment name="uicr_mbr_params_page" start="0x10001018" size="0x4">
     <ProgramSection alignment="4" keep="Yes" load="Yes" name=".uicr_mbr_params_page" address_symbol="__start_uicr_mbr_params_page" end_symbol="__stop_uicr_mbr_params_page" start = "0x10001018" size="0x4" />
   </MemorySegment>
+  <MemorySegment name="uicr_nrf_dfu_hw_version" start="0x10001080" size="0x4">
+    <ProgramSection alignment="4" keep="Yes" load="Yes" name=".uicr_nrf_dfu_hw_version" address_symbol="__start_uicr_nrf_dfu_hw_version" end_symbol="__stop_uicr_nrf_dfu_hw_version" start = "0x10001080" size="0x4" />
+  </MemorySegment>
 </Root>

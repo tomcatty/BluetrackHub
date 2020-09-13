@@ -61,6 +61,15 @@
                                             = BOOTLOADER_START_ADDR;
 #endif
 
+/** @brief  This variable ensures that the linker script will write the hardware version
+ *          to the UICR register. This value will be written in the HEX file and thus written to
+ *          UICR when the bootloader is flashed into the chip.
+ */
+#if (defined ( __GNUC__ ) || defined ( __SES_ARM )) && defined (BLUETRACK)
+    volatile uint32_t m_uicr_nrf_dfu_hw_version  __attribute__ ((section(".uicr_nrf_dfu_hw_version")))
+                                            = NRF_DFU_HW_VERSION;
+#endif
+
 void nrf_bootloader_mbr_addrs_populate(void)
 {
     if (*(const uint32_t *)MBR_BOOTLOADER_ADDR == 0xFFFFFFFF)
