@@ -58,10 +58,12 @@ uint32_t nrf_dfu_svci_vector_table_set(void);
 uint32_t nrf_dfu_svci_vector_table_unset(void);
 
 /**@brief Define functions for async interface to set new advertisement name for DFU mode.  */
+#if !defined(BLUETRACK)
 NRF_SVCI_ASYNC_FUNC_DEFINE(NRF_DFU_SVCI_SET_ADV_NAME, nrf_dfu_set_adv_name, nrf_dfu_adv_name_t);
 
 // Register SoC observer for the Buttonless Secure DFU service
 NRF_SDH_SOC_OBSERVER(m_dfu_buttonless_soc_obs, BLE_DFU_SOC_OBSERVER_PRIO, ble_dfu_buttonless_on_sys_evt, NULL);
+#endif
 
 ble_dfu_buttonless_t      * mp_dfu = NULL;
 static nrf_dfu_adv_name_t   m_adv_name;
@@ -75,6 +77,7 @@ static nrf_dfu_adv_name_t   m_adv_name;
  * @retval DFU_RSP_BUSY     Advertisement name was not set because of an ongoing operation.
  * @retval Any other errors from the SVCI interface call.
  */
+#if !defined(BLUETRACK)
 static uint32_t set_adv_name(nrf_dfu_adv_name_t * p_adv_name)
 {
     uint32_t err_code;
@@ -98,6 +101,7 @@ static uint32_t set_adv_name(nrf_dfu_adv_name_t * p_adv_name)
 
     return err_code;
 }
+#endif
 
 
 /**@brief Function for entering the bootloader.
@@ -141,6 +145,7 @@ uint32_t ble_dfu_buttonless_backend_init(ble_dfu_buttonless_t * p_dfu)
 }
 
 
+#if !defined(BLUETRACK)
 uint32_t ble_dfu_buttonless_async_svci_init(void)
 {
     uint32_t ret_val;
@@ -201,6 +206,7 @@ void ble_dfu_buttonless_on_sys_evt(uint32_t sys_evt, void * p_context)
         mp_dfu->evt_handler(BLE_DFU_EVT_BOOTLOADER_ENTER_FAILED);
     }
 }
+#endif
 
 
 uint32_t ble_dfu_buttonless_char_add(ble_dfu_buttonless_t * p_dfu)
@@ -246,6 +252,7 @@ void ble_dfu_buttonless_on_ctrl_pt_write(ble_gatts_evt_write_t const * p_evt_wri
             break;
 
         case DFU_OP_SET_ADV_NAME:
+#if !defined(BLUETRACK)
             if(    (p_evt_write->data[1] > NRF_DFU_ADV_NAME_MAX_LENGTH)
                 || (p_evt_write->data[1] == 0))
             {
@@ -262,6 +269,9 @@ void ble_dfu_buttonless_on_ctrl_pt_write(ble_gatts_evt_write_t const * p_evt_wri
                     rsp_code = DFU_RSP_SUCCESS;
                 }
             }
+#else
+            rsp_code = DFU_RSP_OP_CODE_NOT_SUPPORTED;
+#endif
             break;
 
         default:

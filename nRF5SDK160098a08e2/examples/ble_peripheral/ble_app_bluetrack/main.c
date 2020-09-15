@@ -48,6 +48,7 @@
 #include "nrf_drv_ppi.h"
 #include "nrf_drv_saadc.h"
 #include "nrf_dfu_types.h"
+#include "ble_dfu.h"
 
 #include "nrf_log.h"
 #include "nrf_log_ctrl.h"
@@ -2042,6 +2043,35 @@ static void nrf_qwr_error_handler(uint32_t nrf_error)
 }
 
 
+/**@brief Function for handling dfu events from the Buttonless Secure DFU service
+ *
+ * @param[in]   event   Event from the Buttonless Secure DFU service.
+ */
+static void ble_dfu_evt_handler(ble_dfu_buttonless_evt_type_t event)
+{
+    switch (event)
+    {
+        case BLE_DFU_EVT_BOOTLOADER_ENTER_PREPARE:
+            NRF_LOG_INFO("Device is preparing to enter bootloader mode.");
+            break;
+        case BLE_DFU_EVT_BOOTLOADER_ENTER:
+            NRF_LOG_INFO("Device will enter bootloader mode.");
+            break;
+        case BLE_DFU_EVT_BOOTLOADER_ENTER_FAILED:
+            NRF_LOG_ERROR("Request to enter bootloader mode failed asynchronously.");
+            APP_ERROR_CHECK(false);
+            break;
+        case BLE_DFU_EVT_RESPONSE_SEND_ERROR:
+            NRF_LOG_ERROR("Request to send a response to client failed.");
+            APP_ERROR_CHECK(false);
+            break;
+        default:
+            NRF_LOG_ERROR("Unknown event from ble_dfu_buttonless.");
+            break;
+    }
+}
+
+
 /**@brief Function for initializing services that will be used by the application.
  */
 static void services_init(void)
@@ -2052,11 +2082,19 @@ static void services_init(void)
     nrf_ble_qwr_init_t   qwr_init = {0};
     ble_srv_utf8_str_t   manufact_name_str = {.length = strlen(MANUFACTURER_NAME),.p_str  = (uint8_t *)MANUFACTURER_NAME};
     ble_srv_utf8_str_t   model_num_str = {.length = strlen(MODEL_NUMBER),.p_str  = (uint8_t *)MODEL_NUMBER}; 
+    ble_dfu_buttonless_init_t dfus_init =
+    {
+        .evt_handler = ble_dfu_evt_handler
+    };
 
     // Initialise Queued Write Module.
     qwr_init.error_handler = nrf_qwr_error_handler;
 
     err_code = nrf_ble_qwr_init(&m_qwr, &qwr_init);
+    APP_ERROR_CHECK(err_code);
+
+    // Initialise buttonless DFU service
+    err_code = ble_dfu_buttonless_init(&dfus_init);
     APP_ERROR_CHECK(err_code);
 
     // Intitialise BlueTrack write handlers
