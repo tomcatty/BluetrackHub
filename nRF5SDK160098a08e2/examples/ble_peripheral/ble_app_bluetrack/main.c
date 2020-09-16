@@ -56,6 +56,9 @@
 
 #include "gatts_cache_manager.h"
 
+#include "nrf_bootloader_info.h"
+#include "nrf_mbr.h"
+
 #define DREKKER_DEVELOPMENT_COMPANY_ID  0x0343                                      /**< Assigned by Bluetooth SIG. */            
 
 #define BOOTLOADER_SETTINGS_PAGE_ADDR   0x0007F000
@@ -1965,17 +1968,27 @@ static void advertising_init(void)
     ble_advdata_t            srdata;
     ble_gap_adv_params_t     adv_params;
     ble_advdata_manuf_data_t manuf_data;
+    uint8_t                  identifier[22];
+    uint32_t                 hw_version;
+    uint16_t                 sd_version;
+    uint32_t                 bootloader_version;
+    uint32_t                 app_version;
     uint32_t                 deviceID[2];
-    uint8_t                  identifier[12];
-    uint32_t                 firmware_version;
     ble_uuid_t adv_uuids[] = {{BLUETRACK_UUID_SERVICE, m_bluetrack.uuid_type}};
-
-    // Retrieve firmware version from bootloader settings page
-    nrf_dfu_settings_t *p_settings = (nrf_dfu_settings_t*)BOOTLOADER_SETTINGS_PAGE_ADDR;
-    firmware_version = p_settings->app_version;
     
     // Construct manufacturing data
     manuf_data.company_identifier = DREKKER_DEVELOPMENT_COMPANY_ID;
+
+    // Retrieve hardware version from UICR
+    hw_version = NRF_UICR->CUSTOMER[0];
+
+    // Retrieve softdevice version from fixed location
+    sd_version = SD_OFFSET_GET_UINT16(MBR_SIZE,0x0C);
+
+    // Retrieve bootloader and app version from bootloader settings page
+    nrf_dfu_settings_t *p_settings = (nrf_dfu_settings_t*)BOOTLOADER_SETTINGS_PAGE_ADDR;
+    bootloader_version = p_settings->bootloader_version;
+    app_version = p_settings->app_version;
 
     deviceID[0] = NRF_FICR->DEVICEID[0];
     deviceID[1] = NRF_FICR->DEVICEID[1];
@@ -1983,32 +1996,42 @@ static void advertising_init(void)
     NRF_LOG_INFO("deviceID[0] = 0x%x, deviceID[1] = 0x%x", deviceID[0], deviceID[1]);
 
     // Make everything little endian
-    identifier[0] = firmware_version & 0xFF;
-    identifier[1] = (firmware_version >> 8) & 0xFF;
-    identifier[2] = (firmware_version >> 16) & 0xFF;
-    identifier[3] = (firmware_version >> 24) & 0xFF;
-    identifier[4] = deviceID[0] & 0xFF;
-    identifier[5] = (deviceID[0] >> 8) & 0xFF;
-    identifier[6] = (deviceID[0] >> 16) & 0xFF;
-    identifier[7] = (deviceID[0] >> 24) & 0xFF;
-    identifier[8] = deviceID[1] & 0xFF;
-    identifier[9] = (deviceID[1] >> 8) & 0xFF;
-    identifier[10] = (deviceID[1] >> 16) & 0xFF;
-    identifier[11] = (deviceID[1] >> 24) & 0xFF;
+    identifier[0] = hw_version & 0xFF;
+    identifier[1] = (hw_version >> 8) & 0xFF;
+    identifier[2] = (hw_version >> 16) & 0xFF;
+    identifier[3] = (hw_version >> 24) & 0xFF;
+    identifier[4] = sd_version & 0xFF;
+    identifier[5] = (sd_version >> 8) & 0xFF;
+    identifier[6] = bootloader_version & 0xFF;
+    identifier[7] = (bootloader_version >> 8) & 0xFF;
+    identifier[8] = (bootloader_version >> 16) & 0xFF;
+    identifier[9] = (bootloader_version >> 24) & 0xFF;
+    identifier[10] = app_version & 0xFF;
+    identifier[11] = (app_version >> 8) & 0xFF;
+    identifier[12] = (app_version >> 16) & 0xFF;
+    identifier[13] = (app_version >> 24) & 0xFF;
+    identifier[14] = deviceID[0] & 0xFF;
+    identifier[15] = (deviceID[0] >> 8) & 0xFF;
+    identifier[16] = (deviceID[0] >> 16) & 0xFF;
+    identifier[17] = (deviceID[0] >> 24) & 0xFF;
+    identifier[18] = deviceID[1] & 0xFF;
+    identifier[19] = (deviceID[1] >> 8) & 0xFF;
+    identifier[20] = (deviceID[1] >> 16) & 0xFF;
+    identifier[21] = (deviceID[1] >> 24) & 0xFF;
 
     manuf_data.data.p_data = identifier;
     manuf_data.data.size = sizeof(identifier);
 
     // Build and set advertising data
     memset(&advdata, 0, sizeof(advdata));
-    advdata.name_type               = BLE_ADVDATA_FULL_NAME;
-    advdata.flags                   = BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE; // Set this as we advertise for an unlimited time
-    advdata.p_manuf_specific_data   = &manuf_data;
+    advdata.flags                   = BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE; // 1+1+1, set this as we advertise for an unlimited time
+    advdata.p_manuf_specific_data   = &manuf_data; // 1+1+2+22
     
     // Build and set scan response data
     memset(&srdata, 0, sizeof(srdata));
-    srdata.uuids_complete.uuid_cnt = sizeof(adv_uuids) / sizeof(adv_uuids[0]);
-    srdata.uuids_complete.p_uuids  = adv_uuids;
+    srdata.name_type                     = BLE_ADVDATA_FULL_NAME; // 1+1+9
+    srdata.uuids_more_available.uuid_cnt = sizeof(adv_uuids) / sizeof(adv_uuids[0]);
+    srdata.uuids_more_available.p_uuids  = adv_uuids; //1+1+16
 
     err_code = ble_advdata_encode(&advdata, m_adv_data.adv_data.p_data, &m_adv_data.adv_data.len);
     APP_ERROR_CHECK(err_code);
