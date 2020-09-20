@@ -62,10 +62,46 @@
 #include "nrf_delay.h"
 #include "nrf_gpio.h"
 
+#define MAIN_DCC_PIN_NO                 2
+#define BRAKE_N_PIN_NO                  26
+#define RELAY_1_PIN_NO                  9
+#define RELAY_2_PIN_NO                  10
+#define RELAY_3_PIN_NO                  11
+#define RELAY_4_PIN_NO                  12
+#define RELAY_5_PIN_NO                  13
+#define RELAY_6_PIN_NO                  14
+#define RELAY_7_PIN_NO                  15
+#define RELAY_8_PIN_NO                  16
+#define RELAY_9_PIN_NO                  17
+#define RELAY_10_PIN_NO                 18
+#define RELAY_11_PIN_NO                 19
+#define RELAY_12_PIN_NO                 20
+#define RELAY_13_PIN_NO                 22
+#define RELAY_14_PIN_NO                 23
+#define RELAY_15_PIN_NO                 21
 #define STOP_LED_PIN_NO                 25
+#define PROG_DCC_PIN_NO                 27                            
 #define ERROR_LED_PIN_NO                29
 #define BLE_LED_PIN_NO                  30
 #define PROG_LED_PIN_NO                 31
+
+#define N_OUTPUTS                       15
+
+static uint8_t                          output_pin[N_OUTPUTS] = {RELAY_1_PIN_NO,
+                                                                 RELAY_2_PIN_NO,
+                                                                 RELAY_3_PIN_NO,
+                                                                 RELAY_4_PIN_NO,
+                                                                 RELAY_5_PIN_NO,
+                                                                 RELAY_6_PIN_NO,
+                                                                 RELAY_7_PIN_NO,
+                                                                 RELAY_8_PIN_NO,
+                                                                 RELAY_9_PIN_NO,
+                                                                 RELAY_10_PIN_NO,
+                                                                 RELAY_11_PIN_NO,
+                                                                 RELAY_12_PIN_NO,
+                                                                 RELAY_13_PIN_NO,
+                                                                 RELAY_14_PIN_NO,
+                                                                 RELAY_15_PIN_NO};
 
 static void on_error(void)
 {
@@ -102,25 +138,46 @@ void app_error_handler_bare(uint32_t error_code)
     on_error();
 }
 
-/**@brief Function for initialising the GPIOTE module.
+/**@brief Function for initialising the GPIOs.
  */
 static void gpio_init(void)
 {
-    // Initialise stop LED (start off) - under CPU control
+    uint8_t i;
+
+    // Initialise stop LED (start off)
     nrf_gpio_cfg_output(STOP_LED_PIN_NO);
     nrf_gpio_pin_clear(STOP_LED_PIN_NO);
 
-    // Initialise error LED (start off) - under CPU control
+    // Initialise error LED (start off)
     nrf_gpio_cfg_output(ERROR_LED_PIN_NO);
     nrf_gpio_pin_clear(ERROR_LED_PIN_NO);
 
-    // Initialise BLE LED (start off) - under CPU control
+    // Initialise BLE LED (start off)
     nrf_gpio_cfg_output(BLE_LED_PIN_NO);
     nrf_gpio_pin_clear(BLE_LED_PIN_NO);
 
-    // Initialise programming LED (start off) - under CPU control
+    // Initialise programming LED (start off)
     nrf_gpio_cfg_output(PROG_LED_PIN_NO);
     nrf_gpio_pin_clear(PROG_LED_PIN_NO);
+
+    // Initialise main DCC output (always off)
+    nrf_gpio_cfg_output(MAIN_DCC_PIN_NO);
+    nrf_gpio_pin_clear(MAIN_DCC_PIN_NO);
+
+    // Initialise brake output (always on)
+    nrf_gpio_cfg_output(BRAKE_N_PIN_NO);
+    nrf_gpio_pin_set(BRAKE_N_PIN_NO);
+
+    // Initialise relay outputs (always off)
+    for (i = 0; i < (N_OUTPUTS); i++)
+    {
+        nrf_gpio_cfg_output(output_pin[i]);
+        nrf_gpio_pin_clear(output_pin[i]);
+    }
+
+    // Initialise programming DCC output (always off)
+    nrf_gpio_cfg_output(PROG_DCC_PIN_NO);
+    nrf_gpio_pin_clear(PROG_DCC_PIN_NO);
 }
 
 /**

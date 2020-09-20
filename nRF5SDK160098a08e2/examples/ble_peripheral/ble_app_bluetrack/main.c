@@ -94,7 +94,7 @@
 #define PROG_I_SENSE_INPUT              NRF_SAADC_INPUT_AIN2
 #define MAIN_I_SENSE_CHANNEL            0                                           /**< ADC channel used for MAIN current sense, this is also the index for the result in adc_buffer */
 #define PROG_I_SENSE_CHANNEL            1                                           /**< ADC channel used for PROG current sense, this is also the index for the result in adc_buffer */
-#define ADC_LIMIT                       14254                                       /**< Corresponds to 3A for minimum sensitivity and 2A for maximum sensitivity */
+#define ADC_LIMIT                       8409                                        /**< Corresponds to 1.77A for minimum sensitivity and 1.18A for maximum sensitivity */
 #define ADC_DELTA                       285                                         /**< ADC value above the baseline required to trigger an acknowledge, corresponds to 60mA for minimum sensitivity and 40mA for maximum sensitivity */
 
 #define N_OUTPUTS                       15                                          /**< 15 Relay Outputs in total */
