@@ -70,6 +70,7 @@
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 
+#include "nrf_nvic.h"
 
 #define DEVICE_NAME                     "Nordic_Blinky"                         /**< Name of device. Will be included in the advertising data. */
 
@@ -80,13 +81,14 @@
 #define ADVERTISING_LED                 BSP_BOARD_LED_0                         /**< Is on when device is advertising. */
 #define CONNECTED_LED                   BSP_BOARD_LED_1                         /**< Is on when device has connected. */
 #define LEDBUTTON_LED                   BSP_BOARD_LED_2                         /**< LED to be toggled with the help of the LED Button Service. */
+#define RADIO_LED                       BSP_BOARD_LED_3         
 #define LEDBUTTON_BUTTON                BSP_BUTTON_0                            /**< Button that will trigger the notification event with the LED Button Service */
 
-#define APP_ADV_INTERVAL                64                                      /**< The advertising interval (in units of 0.625 ms; this value corresponds to 40 ms). */
+#define APP_ADV_INTERVAL                MSEC_TO_UNITS(20, UNIT_0_625_MS)        /**< The advertising interval (in units of 0.625 ms; this value corresponds to 40 ms). */
 #define APP_ADV_DURATION                BLE_GAP_ADV_TIMEOUT_GENERAL_UNLIMITED   /**< The advertising duration (180 seconds) in units of 10 milliseconds. */
 
-#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(100, UNIT_1_25_MS)        /**< Minimum acceptable connection interval (0.5 seconds). */
-#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(200, UNIT_1_25_MS)        /**< Maximum acceptable connection interval (1 second). */
+#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(150, UNIT_1_25_MS)         /**< Minimum acceptable connection interval (0.5 seconds). */
+#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(300, UNIT_1_25_MS)        /**< Maximum acceptable connection interval (1 second). */
 #define SLAVE_LATENCY                   0                                       /**< Slave latency. */
 #define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(4000, UNIT_10_MS)         /**< Connection supervisory time-out (4 seconds). */
 
@@ -631,11 +633,49 @@ static void idle_state_handle(void)
     }
 }
 
+/**@brief Function for initializing Radio Notification Software Interrupts.
+ */
+ret_code_t radio_notification_init(uint32_t irq_priority, uint8_t notification_type, uint8_t notification_distance)
+{
+    ret_code_t err_code;
+
+    err_code = sd_nvic_ClearPendingIRQ(SWI1_IRQn);
+    if (err_code != NRF_SUCCESS)
+    {
+        return err_code;
+    }
+
+    err_code = sd_nvic_SetPriority(SWI1_IRQn, irq_priority);
+    if (err_code != NRF_SUCCESS)
+    {
+        return err_code;
+    }
+
+    err_code = sd_nvic_EnableIRQ(SWI1_IRQn);
+    if (err_code != NRF_SUCCESS)
+    {
+        return err_code;
+    }
+
+    // Configure the event
+    return sd_radio_notification_cfg_set(notification_type, notification_distance);
+}
+
+/**@brief Software interrupt 1 IRQ Handler, handles radio notification interrupts.
+ */
+void SWI1_IRQHandler(bool radio_evt)
+{
+    if (radio_evt)
+    {
+        bsp_board_led_invert(RADIO_LED); //Toggle the status of the LED on each radio notification event
+    }
+}
 
 /**@brief Function for application main entry.
  */
 int main(void)
 {
+    ret_code_t err_code;
     // Initialize.
     log_init();
     timers_init();
@@ -643,6 +683,8 @@ int main(void)
     buttons_init();
     power_management_init();
     ble_stack_init();
+    err_code = radio_notification_init(3, NRF_RADIO_NOTIFICATION_TYPE_INT_ON_ACTIVE, NRF_RADIO_NOTIFICATION_DISTANCE_800US);
+    APP_ERROR_CHECK(err_code);
     gap_params_init();
     gatt_init();
     services_init();

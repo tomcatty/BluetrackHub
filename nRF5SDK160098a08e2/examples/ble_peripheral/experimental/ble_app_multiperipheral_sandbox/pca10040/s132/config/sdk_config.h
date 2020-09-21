@@ -7487,7 +7487,7 @@
  
 
 #ifndef NRF_FPRINTF_FLAG_AUTOMATIC_CR_ON_LF_ENABLED
-#define NRF_FPRINTF_FLAG_AUTOMATIC_CR_ON_LF_ENABLED 1
+#define NRF_FPRINTF_FLAG_AUTOMATIC_CR_ON_LF_ENABLED 0
 #endif
 
 // <q> NRF_FPRINTF_DOUBLE_ENABLED  - Enable IEEE-754 double precision formatting.
@@ -7509,7 +7509,7 @@
 // <e> NRF_LOG_BACKEND_RTT_ENABLED - nrf_log_backend_rtt - Log RTT backend
 //==========================================================
 #ifndef NRF_LOG_BACKEND_RTT_ENABLED
-#define NRF_LOG_BACKEND_RTT_ENABLED 0
+#define NRF_LOG_BACKEND_RTT_ENABLED 1
 #endif
 // <o> NRF_LOG_BACKEND_RTT_TEMP_BUFFER_SIZE - Size of buffer for partially processed strings. 
 // <i> Size of the buffer is a trade-off between RAM usage and processing.
@@ -7542,7 +7542,7 @@
 // <e> NRF_LOG_BACKEND_UART_ENABLED - nrf_log_backend_uart - Log UART backend
 //==========================================================
 #ifndef NRF_LOG_BACKEND_UART_ENABLED
-#define NRF_LOG_BACKEND_UART_ENABLED 1
+#define NRF_LOG_BACKEND_UART_ENABLED 0
 #endif
 // <o> NRF_LOG_BACKEND_UART_TX_PIN - UART TX pin 
 #ifndef NRF_LOG_BACKEND_UART_TX_PIN
@@ -7659,7 +7659,7 @@
 // <4=> Debug 
 
 #ifndef NRF_LOG_DEFAULT_LEVEL
-#define NRF_LOG_DEFAULT_LEVEL 3
+#define NRF_LOG_DEFAULT_LEVEL 4
 #endif
 
 // <q> NRF_LOG_DEFERRED  - Enable deffered logger.
@@ -11258,7 +11258,7 @@
 
 // <o> NRF_SDH_BLE_PERIPHERAL_LINK_COUNT - Maximum number of peripheral links. 
 #ifndef NRF_SDH_BLE_PERIPHERAL_LINK_COUNT
-#define NRF_SDH_BLE_PERIPHERAL_LINK_COUNT 4
+#define NRF_SDH_BLE_PERIPHERAL_LINK_COUNT 20
 #endif
 
 // <o> NRF_SDH_BLE_CENTRAL_LINK_COUNT - Maximum number of central links. 
@@ -11270,7 +11270,7 @@
 // <i> Maximum number of total concurrent connections using the default configuration.
 
 #ifndef NRF_SDH_BLE_TOTAL_LINK_COUNT
-#define NRF_SDH_BLE_TOTAL_LINK_COUNT 4
+#define NRF_SDH_BLE_TOTAL_LINK_COUNT 20
 #endif
 
 // <o> NRF_SDH_BLE_GAP_EVENT_LENGTH - GAP event length. 
