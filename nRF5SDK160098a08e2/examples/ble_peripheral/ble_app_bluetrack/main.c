@@ -49,6 +49,7 @@
 #include "nrf_drv_saadc.h"
 #include "nrf_dfu_types.h"
 #include "ble_dfu.h"
+#include "nrf_drv_pwm.h"
 
 #include "nrf_log.h"
 #include "nrf_log_ctrl.h"
@@ -136,7 +137,6 @@
 
 #define MAIN                            0                                           /**< Indicates DCC commands are sent to the main track, used by both programming_track_state and programming_track_mode. */
 #define PROGRAMMING                     1                                           /**< Indicates DCC commands are sent to the programming track, used by both programming_track_state and programming_track_mode. */
-#define MAIN_REPEAT                     2                                           /**< Indicates repeating DCC commands are being sent to the main track in programming mode, only used by programming_track_state. */
 
 #define DEVICE_NAME                     "BlueTrack"                                /**< Name of device. Will be included in the advertising data. Limit length to 11 to allow Master Emulator to connect (unexplained). */
 
@@ -162,6 +162,8 @@
 
 #define SCHED_MAX_EVENT_DATA_SIZE       sizeof(app_timer_event_t)                   /**< Maximum size of scheduler events. Timer is our largest scheduled event (8 bytes). Note that scheduler BLE stack events do not contain any data, as the events are being pulled from the stack in the event handler. */
 #define SCHED_QUEUE_SIZE                10                                          /**< Maximum number of events in the scheduler queue. This is a best guess. */
+
+#define DCC_COMMAND_MAX_N_BITS          97                                          /**< Maximum number of bits in a DCC command (3*32 + 1 "one" bit) */
 
 /**@brief Structure of a DCC command. */
 typedef struct
@@ -195,9 +197,10 @@ NRF_BLE_QWR_DEF(m_qwr);                                                         
 APP_TIMER_DEF(output_timer);                                                                      /**< App Timer instance for relay output timing */
 APP_TIMER_DEF(feedback_timer);                                                                    /**< App Timer instance for feedback ADC measurement timing */
 
-const nrf_drv_timer_t                   TIMER_DCC_DATA =           NRF_DRV_TIMER_INSTANCE(1);
 const nrf_drv_timer_t                   TIMER_BLE_LED =            NRF_DRV_TIMER_INSTANCE(2);
-const nrf_drv_timer_t                   TIMER_DCC_CONTINOUS_ONES = NRF_DRV_TIMER_INSTANCE(3);
+
+static nrf_drv_pwm_t                    m_pwm0 =                   NRF_DRV_PWM_INSTANCE(0);
+static nrf_drv_pwm_t                    m_pwm1 =                   NRF_DRV_PWM_INSTANCE(1);
 
 static uint16_t                         m_conn_handle = BLE_CONN_HANDLE_INVALID;                  /**< Handle of the current connection. */
 static uint8_t                          m_adv_handle = BLE_GAP_ADV_SET_HANDLE_NOT_SET;            /**< Advertising handle used to identify an advertising set. */
@@ -216,10 +219,6 @@ static ble_gap_adv_data_t               m_adv_data = {                          
                                                          }
                                                      };                                              
 static nrf_ppi_channel_t                ble_led_timer_to_ble_led;                                 /**< PPI channel linking BLE LED timer to the BLE LED */
-static nrf_ppi_channel_t                dcc_data_to_main_dcc;                                     /**< PPI channel linking DCC data timer to the main DCC output */
-static nrf_ppi_channel_t                dcc_data_to_prog_dcc;                                     /**< PPI channel linking DCC data timer to the programming DCC output */
-static nrf_ppi_channel_t                dcc_continuous_ones_to_main_dcc;                          /**< PPI channel linking DCC continuous ones timer to the main DCC output */
-static nrf_ppi_channel_t                dcc_continuous_ones_to_prog_dcc;                          /**< PPI channel linking DCC continuous ones timer to the programming DCC output */
 static nrf_drv_gpiote_pin_t             output_pin[N_OUTPUTS] = {RELAY_1_PIN_NO,                  /**< Pin Number storage for the relay outputs */
                                                                  RELAY_2_PIN_NO,
                                                                  RELAY_3_PIN_NO,
@@ -239,8 +238,6 @@ static bool                             output_flags[N_OUTPUTS];                
 static dcc_command_t                    dcc_command_buffer[DCC_COMMAND_BUFFER_SIZE];              /**< DCC command buffer that stores pending commands */
 static uint8_t                          producer_index;                                           /**< Index of the next available DCC command buffer slot that can be filled */
 static uint8_t                          consumer_index;                                           /**< Index of the DCC command buffer slot currently being transmitted */
-static bool                             phase1_complete;                                          /**< Flag to control phases of DCC command */
-static bool                             phase2_complete;                                          /**< Flag to control phases of DCC command */
 static bool                             dcc_disabled;                                             /**< Flag to indicate whether DCC has been disabled completely */
 static bool                             adc_baseline_flag;                                        /**< Flag to indicate to the ADC it should store its result as a baseline */
 static nrf_saadc_value_t                adc_baseline;                                             /**< Baseline of current feedback measurement */
@@ -259,14 +256,13 @@ static uint8_t                          service_command_value;                  
 static uint16_t                         read_byte_counter;                                        /**< Read byte counter of the service command pending/in progress */
 static uint8_t                          read_bit_counter;                                         /**< Read bit counter of the service command pending/in progress */
 static uint8_t                          read_bit_value;                                           /**< Read bit response of the service command pending/in progress */
-static dcc_command_t                    idle_packet;                                              /**< Memory reserved to transmit idle packets */
 static uint32_t                         active_speed_command_index;                               /**< Current place in the speed command array */
 static dcc_command_t                    speed_command_array_temp[SPEED_COMMAND_ARRAY_SIZE];       /**< Array for sending periodic speed commands */
 static dcc_command_t                    speed_command_array[SPEED_COMMAND_ARRAY_SIZE];            /**< Array for storing periodic speed commands */
 static uint8_t                          speed_command_address_type[SPEED_COMMAND_ARRAY_SIZE];     /**< Array for keeping track of the address type the corresponding periodic speed command applies to */
 static uint16_t                         speed_command_address[SPEED_COMMAND_ARRAY_SIZE];          /**< Array for keeping track of the address the corresponding periodic speed command applies to */
-static dcc_command_t *                  active_packet;                                            /**< Tracks the active packet across DCC data timer handler calls */
-static bool                             dcc_packet;                                               /**< Tracks whether the active packet is from dcc_command_buffer across DCC data timer handler calls */
+static nrf_pwm_values_wave_form_t       main_pwm_sequence[DCC_COMMAND_MAX_N_BITS];                /**< Array for main PWM sequence. */
+static nrf_pwm_values_wave_form_t       prog_pwm_sequence[DCC_COMMAND_MAX_N_BITS];                /**< Array for programming PWM sequence. */
 
 /**@brief Function for removing all periodic speed commands
  */
@@ -1167,139 +1163,100 @@ void dummy_saadc_event_handler(nrfx_saadc_evt_t const *p_event)
 }
 
 
-/**@brief Function for handling the DCC_DATA timer event.
- *
- * @details This handler drives the DCC output logic. Based on the phase flags, and the state of the buffer, appropriate values are loaded into DCC_DATA CC
- * register correponding to durations of DCC 1s and 0s. A sync output is triggered at the start of each packet. If required, feedback is collected.
- */
-void timer_dcc_data_event_handler(nrf_timer_event_t event_type, void* p_context)
+/**@brief Function for encoding a DCC packet to the given PWM sequence, returning the encoded length.
+  */
+uint32_t encode_dcc_to_pwm(dcc_command_t *dcc_command, nrf_pwm_values_wave_form_t *pwm_sequence)
 {
-    uint32_t err_code;
-    bool dcc_output_state;
-    static uint32_t counter = 0;
     uint32_t i;
+    uint32_t pwm_sequence_index = 0;
+    bool pwm_sequence_value;
 
-    if (phase1_complete)
+    for (i = 0; i < dcc_command->data0_count; i++)
     {
-        // We have ended phase 1, timer value remains the same for phase 2
-        phase1_complete = false;
-        phase2_complete = true;
-    }
-    else if (phase2_complete)
-    {
-        // We have ended phase 2, timer value update may be required
-        if (active_packet == NULL)
+        pwm_sequence_value = BIT_31 & dcc_command->data0;
+        dcc_command->data0 = (dcc_command->data0 << 1);
+        if (pwm_sequence_value)
         {
-            // We need to draw a new packet from the buffers
-            if (dcc_command_buffer[consumer_index].occupied && !(programming_track_state == MAIN_REPEAT))
-            {
-                active_packet = &dcc_command_buffer[consumer_index];
-                dcc_packet = true;
-            }
-            else if (speed_command_array_temp[active_speed_command_index].occupied && !(programming_track_state == PROGRAMMING))
-            {
-                active_packet = &speed_command_array_temp[active_speed_command_index];
-            }
-            else if (idle_packet.occupied && !(programming_track_state == MAIN_REPEAT))
-            {
-                active_packet = &idle_packet;
-            }
-        }
-        
-        if (active_packet)
-        {
-            // Clear the sync output, only if there is no feedback in progress (it will be cleared when the feedback window ends)
-            if (!feedback_in_progress)
-            {
-                nrf_drv_gpiote_out_clear(SYNC_PIN_NO);
-            }
-            // Enable sync output if this is the first bit of this packet
-            if (active_packet->sync)
-            {
-                nrf_drv_gpiote_out_set(SYNC_PIN_NO);
-                active_packet->sync = false;
-            }
-
-            // Only start feedback if feedback is not in progress, we are sending a dcc packet, and a service command is in progress
-            if (active_packet->feedback && !feedback_in_progress && dcc_packet && service_command_in_progress)
-            {
-                NRF_LOG_INFO("Feedback requested");
-                // Set variables
-                feedback_in_progress = true;
-                adc_baseline_flag = true;
-                feedback_window_end = false;
-                acknowledge = false;
-                // Indicate on sync pin that a feedback window is in progress
-                nrf_drv_gpiote_out_set(SYNC_PIN_NO);
-            }
-            // Clear feedback flag, we do not want to check it again for this packet
-            active_packet->feedback = false;
-
-            // Determine data for transmission
-            if (active_packet->data0_count > 0)
-            {
-                dcc_output_state = BIT_31 & active_packet->data0;
-                active_packet->data0 = (active_packet->data0 << 1);
-                active_packet->data0_count = active_packet->data0_count - 1;
-            }
-            else if (active_packet->data1_count > 0)
-            {
-                dcc_output_state = BIT_31 & active_packet->data1;
-                active_packet->data1 = (active_packet->data1 << 1);
-                active_packet->data1_count = active_packet->data1_count - 1;
-            }
-            else if (active_packet->data2_count > 0)
-            {
-                dcc_output_state = BIT_31 & active_packet->data2;
-                active_packet->data2 = (active_packet->data2 << 1);
-                active_packet->data2_count = active_packet->data2_count - 1;
-            }
-            else
-            {
-                APP_ERROR_CHECK(NRF_ERROR_INVALID_FLAGS);
-            }
-            // Send data
-            phase1_complete = true;
-            phase2_complete = false;
-            nrf_timer_cc_write(TIMER_DCC_DATA.p_reg, NRF_TIMER_CC_CHANNEL0, dcc_output_state ? nrf_drv_timer_us_to_ticks(&TIMER_DCC_DATA, DCC_ONE_TIME_US) : nrf_drv_timer_us_to_ticks(&TIMER_DCC_DATA, DCC_ZERO_TIME_US));
-
-            // Check for exhaustion and unset occupied
-            if (active_packet->data2_count == 0)
-            {
-                active_packet->occupied = false;
-                active_packet = NULL;
-                if (dcc_packet)
-                {
-                    dcc_packet = false;
-                    // If it was a DCC packet, update global variables
-                    consumer_index = consumer_index + 1;
-                    // Reset consumer index if we have overflowed
-                    if (consumer_index == DCC_COMMAND_BUFFER_SIZE)
-                    {
-                        consumer_index = 0;
-                    }
-                    
-                    // If we were in a service command and the buffer is empty, indicate to the feedback timer that the buffer is empty and the service command is complete.
-                    // Running the feedback timer through all the packets queued by the service command ensures we continue to look for basic acknowledgement pulses through the decoder recovery time (S-9.2.3)
-                    // It is enforced that all service commands include a feedback command at some point, and feedback is only started for dcc_packets during a service command, so it is safe that the feedback timer is the only thing that can turn service_command_in_progress off
-                    // Idle packets and speed command packets can never request feedback, enforced above
-                    if (!dcc_command_buffer[consumer_index].occupied && service_command_in_progress)
-                    {
-                        NRF_LOG_INFO("Ending feedback window");
-                        feedback_window_end = true;
-                    }
-                }
-            }
+            pwm_sequence[pwm_sequence_index].channel_0 = DCC_ONE_TIME_US;
+            pwm_sequence[pwm_sequence_index].counter_top = 2*DCC_ONE_TIME_US;
         }
         else
         {
-            // There is nothing to send in any of the packet sources
-#ifdef DEBUG
-            NRF_LOG_INFO("All buffers empty, counter: %d", counter);
-#endif
-            counter = counter + 1;
+            pwm_sequence[pwm_sequence_index].channel_0 = DCC_ZERO_TIME_US;
+            pwm_sequence[pwm_sequence_index].counter_top = 2*DCC_ZERO_TIME_US;
+        }
+        pwm_sequence_index++;
+    }
 
-            // We're guaranteed to have an empty buffer, so execute a service command, if one is pending
+    for (i = 0; i < dcc_command->data1_count; i++)
+    {
+        pwm_sequence_value = BIT_31 & dcc_command->data1;
+        dcc_command->data1 = (dcc_command->data1 << 1);
+        if (pwm_sequence_value)
+        {
+            pwm_sequence[pwm_sequence_index].channel_0 = DCC_ONE_TIME_US;
+            pwm_sequence[pwm_sequence_index].counter_top = 2*DCC_ONE_TIME_US;
+        }
+        else
+        {
+            pwm_sequence[pwm_sequence_index].channel_0 = DCC_ZERO_TIME_US;
+            pwm_sequence[pwm_sequence_index].counter_top = 2*DCC_ZERO_TIME_US;
+        }
+        pwm_sequence_index++;
+    }
+
+    for (i = 0; i < dcc_command->data2_count; i++)
+    {
+        pwm_sequence_value = BIT_31 & dcc_command->data2;
+        dcc_command->data2 = (dcc_command->data2 << 1);
+        if (pwm_sequence_value)
+        {
+            pwm_sequence[pwm_sequence_index].channel_0 = DCC_ONE_TIME_US;
+            pwm_sequence[pwm_sequence_index].counter_top = 2*DCC_ONE_TIME_US;
+        }
+        else
+        {
+            pwm_sequence[pwm_sequence_index].channel_0 = DCC_ZERO_TIME_US;
+            pwm_sequence[pwm_sequence_index].counter_top = 2*DCC_ZERO_TIME_US;
+        }
+        pwm_sequence_index++;
+    }
+
+    // Add a final "one"
+    pwm_sequence[pwm_sequence_index].channel_0 = DCC_ONE_TIME_US;
+    pwm_sequence[pwm_sequence_index].counter_top = 2*DCC_ONE_TIME_US;
+    pwm_sequence_index++;
+
+    return pwm_sequence_index * sizeof(nrf_pwm_values_wave_form_t) / sizeof(uint16_t);
+}
+
+/**@brief Function for handling the completion of DCC packet transmission
+  */
+void dcc_packet_transmitted(bool main)
+{
+    uint32_t err_code;
+    uint32_t i;
+    bool dcc_packet = false;
+    dcc_command_t *active_packet = NULL;
+    dcc_command_t idle_packet;
+    uint32_t length;
+
+    // Indicate the handler has been entered (no longer using sync element of dcc_command_t), this does nothing if the SYNC pin is already high due to feedback in progress
+    nrf_drv_gpiote_out_set(SYNC_PIN_NO);
+
+    // We need to draw a new packet from the buffers
+    if (dcc_command_buffer[consumer_index].occupied && (((programming_track_state == MAIN) && main) || ((programming_track_state == PROGRAMMING) && !main)))
+    {
+        active_packet = &dcc_command_buffer[consumer_index];
+        dcc_packet = true;
+    }
+    else
+    {
+        // There is nothing to send the packet queue, or we've been inhibited from sending
+        // If we were not inhibited from sending, we're guaranteed to have an empty buffer
+        if (((programming_track_state == MAIN) && main) || ((programming_track_state == PROGRAMMING) && !main))
+        {
+            // Execute a service command if one is pending
             if (service_command_pending) {
                 service_command_in_progress = true;
                 service_command_pending = false;
@@ -1307,129 +1264,176 @@ void timer_dcc_data_event_handler(nrf_timer_event_t event_type, void* p_context)
                 APP_ERROR_CHECK(err_code);
                 NRF_LOG_INFO("Executing service command");
             }
-            
-            // There was no valid speed command packet at the current index (or we were inhibited from sending it), so update the temporary array for that index, increment (to avoid fixating on a single valid entry) and identify the next valid one
-
-            // Copy the speed command back over, making sure to set occupied last (a process removing a speed command will set occupied false first)
-            speed_command_array_temp[active_speed_command_index].data0 = speed_command_array[active_speed_command_index].data0;
-            speed_command_array_temp[active_speed_command_index].data0_count = speed_command_array[active_speed_command_index].data0_count;
-            speed_command_array_temp[active_speed_command_index].data1 = speed_command_array[active_speed_command_index].data1;
-            speed_command_array_temp[active_speed_command_index].data1_count = speed_command_array[active_speed_command_index].data1_count;
-            speed_command_array_temp[active_speed_command_index].data2 = speed_command_array[active_speed_command_index].data2;
-            speed_command_array_temp[active_speed_command_index].data2_count = speed_command_array[active_speed_command_index].data2_count;
-            
-            speed_command_array_temp[active_speed_command_index].sync = speed_command_array[active_speed_command_index].sync;
-            speed_command_array_temp[active_speed_command_index].feedback = speed_command_array[active_speed_command_index].feedback;
-            speed_command_array_temp[active_speed_command_index].occupied = speed_command_array[active_speed_command_index].occupied;
-            
-            // Increment the active speed command index so we don't repeat the command over and over
-            active_speed_command_index = active_speed_command_index + 1;
-            // Reset active speed command index if we have overflowed
-            if (active_speed_command_index == SPEED_COMMAND_ARRAY_SIZE)
+        
+            // Now update the programming state if needed
+            if ((programming_track_mode == PROGRAMMING) && (programming_track_state == MAIN))
             {
-                active_speed_command_index = 0;
+                programming_track_state = PROGRAMMING;
+                NRF_LOG_INFO("Switched programming state to PROGRAMMING");
             }
-            
-            // Now go through the array once to find the next valid packet
-            for (i = 0; i < SPEED_COMMAND_ARRAY_SIZE; i++)
+            else if ((programming_track_mode == MAIN) && (programming_track_state == PROGRAMMING))
             {
-                if (speed_command_array_temp[active_speed_command_index].occupied)
+                programming_track_state = MAIN;
+                NRF_LOG_INFO("Switched programming state to MAIN");
+            }
+        }
+
+        // If in main, see if there is an active speed command
+        if (main)
+        {
+            if (speed_command_array_temp[active_speed_command_index].occupied)
+            {
+                active_packet = &speed_command_array_temp[active_speed_command_index];
+            }
+            else
+            {
+                // There was no valid speed command packet at the current index, so update the temporary array for that index, increment (to avoid fixating on a single valid entry) and identify the next valid one
+                // Copy the speed command back over, making sure to set occupied last (a process removing a speed command will set occupied false first)
+                speed_command_array_temp[active_speed_command_index].data0 = speed_command_array[active_speed_command_index].data0;
+                speed_command_array_temp[active_speed_command_index].data0_count = speed_command_array[active_speed_command_index].data0_count;
+                speed_command_array_temp[active_speed_command_index].data1 = speed_command_array[active_speed_command_index].data1;
+                speed_command_array_temp[active_speed_command_index].data1_count = speed_command_array[active_speed_command_index].data1_count;
+                speed_command_array_temp[active_speed_command_index].data2 = speed_command_array[active_speed_command_index].data2;
+                speed_command_array_temp[active_speed_command_index].data2_count = speed_command_array[active_speed_command_index].data2_count;
+        
+                speed_command_array_temp[active_speed_command_index].sync = speed_command_array[active_speed_command_index].sync;
+                speed_command_array_temp[active_speed_command_index].feedback = speed_command_array[active_speed_command_index].feedback;
+                speed_command_array_temp[active_speed_command_index].occupied = speed_command_array[active_speed_command_index].occupied;
+        
+                // Increment the active speed command index so we don't repeat the command over and over
+                active_speed_command_index = active_speed_command_index + 1;
+                // Reset active speed command index if we have overflowed
+                if (active_speed_command_index == SPEED_COMMAND_ARRAY_SIZE)
                 {
-                    // We've found a valid packet
-                    break;
+                    active_speed_command_index = 0;
                 }
-                else
+        
+                // Now go through the array once to find the next valid packet
+                for (i = 0; i < SPEED_COMMAND_ARRAY_SIZE; i++)
                 {
-                    active_speed_command_index = active_speed_command_index + 1;
-                    // Reset active speed command index if we have overflowed
-                    if (active_speed_command_index == SPEED_COMMAND_ARRAY_SIZE)
+                    if (speed_command_array_temp[active_speed_command_index].occupied)
                     {
-                        active_speed_command_index = 0;
+                        // We've found a valid packet
+                        active_packet = &speed_command_array_temp[active_speed_command_index];
+                        break;
+                    }
+                    else
+                    {
+                        active_speed_command_index = active_speed_command_index + 1;
+                        // Reset active speed command index if we have overflowed
+                        if (active_speed_command_index == SPEED_COMMAND_ARRAY_SIZE)
+                        {
+                            active_speed_command_index = 0;
+                        }
                     }
                 }
             }
-            
-            // The idle packet needs refreshing (or we were inhibited from sending it)
+        }
+
+        // Send idle packet if nothing else to send
+        if (!active_packet)
+        {
             idle_packet.data0 = 0xFFFFF000 | (0xFF << 3);
             idle_packet.data0_count = 30;
             idle_packet.data1 = 0x00004000 | (0x00 << 24) | ((0xFF ^ 0x00) << 15);
             idle_packet.data1_count = 18;
             idle_packet.data2 = 0x80000000;
             idle_packet.data2_count = 1;
-            
+        
             idle_packet.sync = false;
             idle_packet.feedback = false;
             idle_packet.occupied = true;
-            
-            // Now update the programming state
-            if ((programming_track_mode == MAIN) && !(programming_track_state == MAIN))
-            {
-                // We only need to change the output if we are programming state
-                if (programming_track_state == PROGRAMMING)
-                {
-                    // Disable channels
-                    err_code = nrf_drv_ppi_channel_disable(dcc_data_to_prog_dcc);
-                    APP_ERROR_CHECK(err_code);
-                    err_code = nrf_drv_ppi_channel_disable(dcc_continuous_ones_to_main_dcc);
-                    APP_ERROR_CHECK(err_code);
-                    
-                    // Enable channels
-                    err_code = nrf_drv_ppi_channel_enable(dcc_data_to_main_dcc);
-                    APP_ERROR_CHECK(err_code);
-                    err_code = nrf_drv_ppi_channel_enable(dcc_continuous_ones_to_prog_dcc);
-                    APP_ERROR_CHECK(err_code);
-                }
-                programming_track_state = MAIN;
-                NRF_LOG_INFO("Switched programming state to MAIN");
-            }
-            else if (programming_track_mode == PROGRAMMING)
-            {
-                if (programming_track_state == PROGRAMMING)
-                {
-                    // Disable channels
-                    err_code = nrf_drv_ppi_channel_disable(dcc_data_to_prog_dcc);
-                    APP_ERROR_CHECK(err_code);
-                    err_code = nrf_drv_ppi_channel_disable(dcc_continuous_ones_to_main_dcc);
-                    APP_ERROR_CHECK(err_code);
-                    
-                    // Enable channels
-                    err_code = nrf_drv_ppi_channel_enable(dcc_data_to_main_dcc);
-                    APP_ERROR_CHECK(err_code);
-                    err_code = nrf_drv_ppi_channel_enable(dcc_continuous_ones_to_prog_dcc);
-                    APP_ERROR_CHECK(err_code);
 
-                    programming_track_state = MAIN_REPEAT;
-                    NRF_LOG_INFO("Switched programming state to MAIN_REPEAT");
-                }
-                else
-                {
-                    // Disable channels
-                    err_code = nrf_drv_ppi_channel_disable(dcc_data_to_main_dcc);
-                    APP_ERROR_CHECK(err_code);
-                    err_code = nrf_drv_ppi_channel_disable(dcc_continuous_ones_to_prog_dcc);
-                    APP_ERROR_CHECK(err_code);
-                    
-                    // Enable channels
-                    err_code = nrf_drv_ppi_channel_enable(dcc_data_to_prog_dcc);
-                    APP_ERROR_CHECK(err_code);
-                    err_code = nrf_drv_ppi_channel_enable(dcc_continuous_ones_to_main_dcc);
-                    APP_ERROR_CHECK(err_code);
-
-                    programming_track_state = PROGRAMMING;
-                    NRF_LOG_INFO("Switched programming state to PROGRAMMING");
-                }
-            }
-
-            // Send a single one, as we have no data to send this time
-            phase1_complete = true;
-            phase2_complete = false;
-            nrf_timer_cc_write(TIMER_DCC_DATA.p_reg, NRF_TIMER_CC_CHANNEL0, nrf_drv_timer_us_to_ticks(&TIMER_DCC_DATA, DCC_ONE_TIME_US));
+            active_packet = &idle_packet;
         }
+    }
+
+    // Only start feedback if feedback is not in progress, we are sending a dcc packet, and a service command is in progress
+    if (active_packet->feedback && !feedback_in_progress && dcc_packet && service_command_in_progress)
+    {
+        NRF_LOG_INFO("Feedback requested");
+        // Set variables
+        feedback_in_progress = true;
+        adc_baseline_flag = true;
+        feedback_window_end = false;
+        acknowledge = false;
+        // Indicate on sync pin that a feedback window is in progress
+        nrf_drv_gpiote_out_set(SYNC_PIN_NO);
+    }
+    // Clear feedback flag
+    active_packet->feedback = false;
+
+    // Determine data for transmission
+    if (main)
+    {
+        length = encode_dcc_to_pwm(active_packet, main_pwm_sequence);
+        nrf_pwm_sequence_t const    m_main_seq =
+        {
+            .values.p_wave_form  = main_pwm_sequence,
+            .length              = length,
+            .repeats             = 0,
+            .end_delay           = 0
+        };
+        (void)nrf_drv_pwm_simple_playback(&m_pwm0, &m_main_seq, 1, 0);
     }
     else
     {
-        APP_ERROR_CHECK(NRF_ERROR_INVALID_FLAGS);
+        length = encode_dcc_to_pwm(active_packet, prog_pwm_sequence);
+        nrf_pwm_sequence_t const    m_prog_seq =
+        {
+            .values.p_wave_form  = prog_pwm_sequence,
+            .length              = length,
+            .repeats             = 0,
+            .end_delay           = 0
+        };
+        (void)nrf_drv_pwm_simple_playback(&m_pwm1, &m_prog_seq, 1, 0);
     }
+
+    // Clear occupied flag
+    active_packet->occupied = false;
+
+    // Advance the consumer index and check exhaustion if it was a DCC packet
+    if (dcc_packet)
+    {
+        consumer_index = consumer_index + 1;
+        // Reset consumer index if we have overflowed
+        if (consumer_index == DCC_COMMAND_BUFFER_SIZE)
+        {
+            consumer_index = 0;
+        }
+        
+        // If we were in a service command and the buffer is empty, indicate to the feedback timer that the buffer is empty and the service command is complete.
+        // Running the feedback timer through all the packets queued by the service command ensures we continue to look for basic acknowledgement pulses through the decoder recovery time (S-9.2.3)
+        // It is enforced that all service commands include a feedback command at some point, and feedback is only started for dcc_packets during a service command, so it is safe that the feedback timer is the only thing that can turn service_command_in_progress off
+        // Idle packets and speed command packets can never request feedback, enforced above
+        if (!dcc_command_buffer[consumer_index].occupied && service_command_in_progress)
+        {
+            NRF_LOG_INFO("Ending feedback window");
+            feedback_window_end = true;
+        }
+    }
+
+    // Clear the sync output, only if there is no feedback in progress (it will be cleared when the feedback window ends)
+    if (!feedback_in_progress)
+    {
+        nrf_drv_gpiote_out_clear(SYNC_PIN_NO);
+    }
+}
+
+
+/**@brief Handler for the PWM module driving the main output
+  */
+void main_pwm_handler(nrf_drv_pwm_evt_type_t event_type)
+{
+    dcc_packet_transmitted(true);
+}
+
+
+/**@brief Handler for the PWM module driving the programming output
+  */
+void prog_pwm_handler(nrf_drv_pwm_evt_type_t event_type)
+{
+    dcc_packet_transmitted(false);
 }
 
 
@@ -1666,11 +1670,6 @@ static void gpiote_init(void)
     err_code = nrf_drv_gpiote_init();
     APP_ERROR_CHECK(err_code);
 
-    // Initialise main DCC output - under PPI control
-    err_code = nrf_drv_gpiote_out_init(MAIN_DCC_PIN_NO, &config_out_toggle_false);
-    APP_ERROR_CHECK(err_code);
-    nrf_drv_gpiote_out_task_enable(MAIN_DCC_PIN_NO);
-
     // Initialise brake output (start with brake on) - under CPU control
     err_code = nrf_drv_gpiote_out_init(BRAKE_N_PIN_NO, &config_out_simple_false);
     APP_ERROR_CHECK(err_code);
@@ -1689,11 +1688,6 @@ static void gpiote_init(void)
     // Initialise stop LED (start stopped) - under CPU control
     err_code = nrf_drv_gpiote_out_init(STOP_LED_PIN_NO, &config_out_simple_true);
     APP_ERROR_CHECK(err_code);   
-
-    // Initialise programming DCC output - under PPI control
-    err_code = nrf_drv_gpiote_out_init(PROG_DCC_PIN_NO, &config_out_toggle_false);
-    APP_ERROR_CHECK(err_code);
-    nrf_drv_gpiote_out_task_enable(PROG_DCC_PIN_NO);
 
     // Initialise thermal input - generates GPIOTE event
     config_in.pull = NRF_GPIO_PIN_PULLUP;
@@ -1717,7 +1711,7 @@ static void gpiote_init(void)
 
 /**@brief Function for initialising timers.
  *
- * @details Initializes the application timer, as well as TIMER1 and TIMER2.
+ * @details Initializes the application timers and hardware timers
  */
 static void timers_init(void)
 {
@@ -1726,23 +1720,10 @@ static void timers_init(void)
     timer_cfg.frequency = NRF_TIMER_FREQ_1MHz;
     timer_cfg.bit_width = NRF_TIMER_BIT_WIDTH_32;
 
-    // Initialise DCC_DATA timer (initially outputs 1s)
-    err_code = nrf_drv_timer_init(&TIMER_DCC_DATA, &timer_cfg, timer_dcc_data_event_handler);
-    APP_ERROR_CHECK(err_code);
-    nrf_drv_timer_extended_compare(&TIMER_DCC_DATA, NRF_TIMER_CC_CHANNEL0, nrf_drv_timer_us_to_ticks(&TIMER_DCC_DATA, DCC_ONE_TIME_US), NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK, true);
-
-    // Implement a constant CC to guard against missing a COMPARE event when we change from ZERO to ONE and the interrupt handler is delayed
-    nrf_drv_timer_extended_compare(&TIMER_DCC_DATA, NRF_TIMER_CC_CHANNEL1, nrf_drv_timer_us_to_ticks(&TIMER_DCC_DATA, DCC_ZERO_TIME_US), NRF_TIMER_SHORT_COMPARE1_CLEAR_MASK, false);
-
     // Initialise BLE_LED timer
     err_code = nrf_drv_timer_init(&TIMER_BLE_LED, &timer_cfg, dummy_timer_event_handler);
     APP_ERROR_CHECK(err_code);
     nrf_drv_timer_extended_compare(&TIMER_BLE_LED, NRF_TIMER_CC_CHANNEL0, nrf_drv_timer_ms_to_ticks(&TIMER_BLE_LED, BLE_LED_TOGGLE_TIME_MS), NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK, false);
-
-    // Initialise DCC_CONTINOUS_ONES timer (always outputs 1s)
-    err_code = nrf_drv_timer_init(&TIMER_DCC_CONTINOUS_ONES, &timer_cfg, dummy_timer_event_handler);
-    APP_ERROR_CHECK(err_code);
-    nrf_drv_timer_extended_compare(&TIMER_DCC_CONTINOUS_ONES, NRF_TIMER_CC_CHANNEL0, nrf_drv_timer_us_to_ticks(&TIMER_DCC_CONTINOUS_ONES, DCC_ONE_TIME_US), NRF_TIMER_SHORT_COMPARE0_CLEAR_MASK, false);
 
     // Initialize application timer module
     err_code = app_timer_init();
@@ -1759,7 +1740,7 @@ static void timers_init(void)
 
 /** @brief Function for initialising the Programmable Peripheral Interconnect (PPI) module.
  *
- * @details PPI is used for BLE LED, DCC Output, and DCC Programming Output.
+ * @details PPI is used for BLE LED
  */
 static void ppi_init(void)
 {
@@ -1774,32 +1755,6 @@ static void ppi_init(void)
     err_code = nrf_drv_ppi_channel_assign(ble_led_timer_to_ble_led, nrf_drv_timer_event_address_get(&TIMER_BLE_LED, NRF_TIMER_EVENT_COMPARE0), nrf_drv_gpiote_out_task_addr_get(BLE_LED_PIN_NO));
     APP_ERROR_CHECK(err_code);
     err_code = nrf_drv_ppi_channel_enable(ble_led_timer_to_ble_led);
-    APP_ERROR_CHECK(err_code);
-
-    // Allocate, assign, and enable DCC Output PPI channels (note DCC Data is enabled initially)
-    err_code = nrf_drv_ppi_channel_alloc(&dcc_data_to_main_dcc);
-    APP_ERROR_CHECK(err_code);
-    err_code = nrf_drv_ppi_channel_assign(dcc_data_to_main_dcc, nrf_drv_timer_event_address_get(&TIMER_DCC_DATA, NRF_TIMER_EVENT_COMPARE0), nrf_drv_gpiote_out_task_addr_get(MAIN_DCC_PIN_NO));
-    APP_ERROR_CHECK(err_code);
-    err_code = nrf_drv_ppi_channel_enable(dcc_data_to_main_dcc);
-    APP_ERROR_CHECK(err_code);
-
-    err_code = nrf_drv_ppi_channel_alloc(&dcc_continuous_ones_to_main_dcc);
-    APP_ERROR_CHECK(err_code);
-    err_code = nrf_drv_ppi_channel_assign(dcc_continuous_ones_to_main_dcc, nrf_drv_timer_event_address_get(&TIMER_DCC_CONTINOUS_ONES, NRF_TIMER_EVENT_COMPARE0), nrf_drv_gpiote_out_task_addr_get(MAIN_DCC_PIN_NO));
-    APP_ERROR_CHECK(err_code);
-
-    // Allocate, assign, and enable Programming DCC Output PPI channels (note DCC Continuous Ones is enabled initially)
-    err_code = nrf_drv_ppi_channel_alloc(&dcc_continuous_ones_to_prog_dcc);
-    APP_ERROR_CHECK(err_code);
-    err_code = nrf_drv_ppi_channel_assign(dcc_continuous_ones_to_prog_dcc, nrf_drv_timer_event_address_get(&TIMER_DCC_CONTINOUS_ONES, NRF_TIMER_EVENT_COMPARE0), nrf_drv_gpiote_out_task_addr_get(PROG_DCC_PIN_NO));
-    APP_ERROR_CHECK(err_code);
-    err_code = nrf_drv_ppi_channel_enable(dcc_continuous_ones_to_prog_dcc);
-    APP_ERROR_CHECK(err_code);
-
-    err_code = nrf_drv_ppi_channel_alloc(&dcc_data_to_prog_dcc);
-    APP_ERROR_CHECK(err_code);
-    err_code = nrf_drv_ppi_channel_assign(dcc_data_to_prog_dcc, nrf_drv_timer_event_address_get(&TIMER_DCC_DATA, NRF_TIMER_EVENT_COMPARE0), nrf_drv_gpiote_out_task_addr_get(PROG_DCC_PIN_NO));
     APP_ERROR_CHECK(err_code);
 }
 
@@ -1845,10 +1800,6 @@ static void bluetrack_init(void)
         output_flags[i] = false;
     }
 
-    // Start with no active packet
-    active_packet = NULL;
-    dcc_packet = false;
-
     // Clear buffer
     memset(dcc_command_buffer, 0, sizeof(dcc_command_buffer));
     
@@ -1856,14 +1807,9 @@ static void bluetrack_init(void)
     remove_all_speed_commands();
     active_speed_command_index = 0;
 
-    // Clear idle memory
-    memset(&idle_packet, 0, sizeof(idle_packet));
-
     // Set indexes and phases
     producer_index = 0;
     consumer_index = 0;
-    phase1_complete = true;
-    phase2_complete = false;
 
     // We start off with DCC enabled
     dcc_disabled = false;
@@ -1889,9 +1835,7 @@ static void timers_start(void)
 {
     uint32_t err_code;
 
-    nrf_drv_timer_enable(&TIMER_DCC_DATA);
     nrf_drv_timer_enable(&TIMER_BLE_LED);
-    nrf_drv_timer_enable(&TIMER_DCC_CONTINOUS_ONES);
 
     // Start relay timer
     err_code = app_timer_start(output_timer, APP_TIMER_TICKS(ACTUATION_INTERVAL_MS), NULL);
@@ -2410,6 +2354,79 @@ static void idle_state_handle(void)
 }
 
 
+/**@brief Function for initialising the PWM module.
+ */
+static void pwm_init_and_start(void)
+{
+    ret_code_t err_code;
+
+    nrf_drv_pwm_config_t const config_main =
+    {
+        .output_pins =
+        {
+            MAIN_DCC_PIN_NO, // channel 0
+            NRF_DRV_PWM_PIN_NOT_USED, // channel 1
+            NRF_DRV_PWM_PIN_NOT_USED, // channel 2
+            NRF_DRV_PWM_PIN_NOT_USED  // channel 3
+        },
+        .irq_priority = APP_IRQ_PRIORITY_HIGHEST,
+        .base_clock   = NRF_PWM_CLK_1MHz,
+        .count_mode   = NRF_PWM_MODE_UP,
+        .top_value    = 2*DCC_ONE_TIME_US,
+        .load_mode    = NRF_PWM_LOAD_WAVE_FORM,
+        .step_mode    = NRF_PWM_STEP_AUTO
+    };
+
+    nrf_drv_pwm_config_t const config_prog =
+    {
+        .output_pins =
+        {
+            PROG_DCC_PIN_NO, // channel 0
+            NRF_DRV_PWM_PIN_NOT_USED, // channel 1
+            NRF_DRV_PWM_PIN_NOT_USED, // channel 2
+            NRF_DRV_PWM_PIN_NOT_USED  // channel 3
+        },
+        .irq_priority = APP_IRQ_PRIORITY_HIGHEST,
+        .base_clock   = NRF_PWM_CLK_1MHz,
+        .count_mode   = NRF_PWM_MODE_UP,
+        .top_value    = 2*DCC_ONE_TIME_US,
+        .load_mode    = NRF_PWM_LOAD_WAVE_FORM,
+        .step_mode    = NRF_PWM_STEP_AUTO
+    };
+
+    err_code = nrf_drv_pwm_init(&m_pwm0, &config_main, main_pwm_handler);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = nrf_drv_pwm_init(&m_pwm1, &config_prog, prog_pwm_handler);
+    APP_ERROR_CHECK(err_code);
+
+    // Set up the initial sequences to transmit a single "one", the handlers will take over after that
+    main_pwm_sequence[0].channel_0 = DCC_ONE_TIME_US;
+    main_pwm_sequence[0].counter_top = 2*DCC_ONE_TIME_US;
+    prog_pwm_sequence[0].channel_0 = DCC_ONE_TIME_US;
+    prog_pwm_sequence[0].counter_top = 2*DCC_ONE_TIME_US;
+
+    nrf_pwm_sequence_t const    m_main_seq =
+    {
+        .values.p_wave_form  = main_pwm_sequence,
+        .length              = (sizeof(main_pwm_sequence[0]) / sizeof(uint16_t)),
+        .repeats             = 0,
+        .end_delay           = 0
+    };
+
+    nrf_pwm_sequence_t const    m_prog_seq =
+    {
+        .values.p_wave_form  = prog_pwm_sequence,
+        .length              = (sizeof(prog_pwm_sequence[0]) / sizeof(uint16_t)),
+        .repeats             = 0,
+        .end_delay           = 0
+    };
+
+    (void)nrf_drv_pwm_simple_playback(&m_pwm0, &m_main_seq, 1, 0);
+    (void)nrf_drv_pwm_simple_playback(&m_pwm1, &m_prog_seq, 1, 0);
+}
+
+
 /**@brief Function for application main entry.
  */
 int main(void)
@@ -2435,6 +2452,7 @@ int main(void)
     NRF_LOG_INFO("Bluetrack started.");
     timers_start();
     advertising_start();
+    pwm_init_and_start();
 
     // Enter main loop
     for (;;)
