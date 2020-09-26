@@ -1357,8 +1357,6 @@ void dcc_packet_transmitted(bool main)
         adc_baseline_flag = true;
         feedback_window_end = false;
         acknowledge = false;
-        // Indicate on sync pin that a feedback window is in progress
-        nrf_drv_gpiote_out_set(SYNC_PIN_NO);
     }
     // Clear feedback flag
     active_packet->feedback = false;
