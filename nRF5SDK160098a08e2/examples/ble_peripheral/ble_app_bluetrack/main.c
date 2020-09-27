@@ -33,6 +33,7 @@
 #include "ble_srv_common.h"
 #include "ble_advdata.h"
 #include "ble_conn_params.h"
+#include "ble_conn_state.h"
 #include "nrf_sdh.h"
 #include "nrf_sdh_ble.h"
 #include "boards.h"
@@ -50,6 +51,7 @@
 #include "nrf_dfu_types.h"
 #include "ble_dfu.h"
 #include "nrf_drv_pwm.h"
+#include "nrf_nvic.h"
 
 #include "nrf_log.h"
 #include "nrf_log_ctrl.h"
@@ -64,6 +66,7 @@
 
 #define BOOTLOADER_SETTINGS_PAGE_ADDR   0x0007F000
 
+#define RADIO_PIN_NO                    0
 #define MAIN_DCC_PIN_NO                 2
 #define MAIN_I_SENSE_PIN_NO             3
 #define BRAKE_N_PIN_NO                  26
@@ -138,24 +141,24 @@
 #define MAIN                            0                                           /**< Indicates DCC commands are sent to the main track, used by both programming_track_state and programming_track_mode. */
 #define PROGRAMMING                     1                                           /**< Indicates DCC commands are sent to the programming track, used by both programming_track_state and programming_track_mode. */
 
-#define DEVICE_NAME                     "BlueTrack"                                /**< Name of device. Will be included in the advertising data. Limit length to 11 to allow Master Emulator to connect (unexplained). */
+#define DEVICE_NAME                     "BlueTrack"                                 /**< Name of device. Will be included in the advertising data. */
 
-#define MODEL_NUMBER                    "BlueTrack Hub"                            /**< Model number for DIS. **/
-#define MANUFACTURER_NAME               "Drekker Development Pty. Ltd."            /**< Manufacturer name for DIS. **/
+#define MODEL_NUMBER                    "BlueTrack Hub V2"                          /**< Model number for DIS. **/
+#define MANUFACTURER_NAME               "Drekker Development Pty. Ltd."             /**< Manufacturer name for DIS. **/
 
-#define APP_BLE_OBSERVER_PRIO           3                                          /**< Application's BLE observer priority. You shouldn't need to modify this value. */
-#define APP_BLE_CONN_CFG_TAG            1                                          /**< A tag identifying the SoftDevice BLE configuration. */
+#define APP_BLE_OBSERVER_PRIO           3                                           /**< Application's BLE observer priority. You shouldn't need to modify this value. */
+#define APP_BLE_CONN_CFG_TAG            1                                           /**< A tag identifying the SoftDevice BLE configuration. */
 
-#define APP_ADV_INTERVAL                MSEC_TO_UNITS(20, UNIT_0_625_MS )          /**< The advertising interval, 20ms recommended by R12 of Accessory Design Guidelines for Apple Devices */
-#define APP_ADV_DURATION                BLE_GAP_ADV_TIMEOUT_GENERAL_UNLIMITED      /**< Advertising duration in 10 ms units. */
+#define APP_ADV_INTERVAL                MSEC_TO_UNITS(152.5, UNIT_0_625_MS )        /**< The advertising interval, 152.5ms acceptable according to R12 of Accessory Design Guidelines for Apple Devices */
+#define APP_ADV_DURATION                BLE_GAP_ADV_TIMEOUT_GENERAL_UNLIMITED       /**< Advertising duration in 10 ms units. */
 
-#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(45, UNIT_1_25_MS)             /**< Minimum acceptable connection interval, needed for responsiveness (45ms complies with R12 of Accessory Design Guidelines for Apple Devices). */
-#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(100, UNIT_1_25_MS)            /**< Maximum acceptable connection interval, needed for responsiveness. */
+#define MIN_CONN_INTERVAL               MSEC_TO_UNITS(165, UNIT_1_25_MS)            /**< Minimum acceptable connection interval, needed for responsiveness (165ms complies with R12 of Accessory Design Guidelines for Apple Devices). */
+#define MAX_CONN_INTERVAL               MSEC_TO_UNITS(180, UNIT_1_25_MS)            /**< Maximum acceptable connection interval, needed for responsiveness, 15ms greater than minimum complies with R12 of Accessory Design Guidelines for Apple Devices. */
 #define SLAVE_LATENCY                   0                                           /**< Slave latency (0 to comply with R12 of Accessory Design Guidelines for Apple Devices). */
-#define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(4000, UNIT_10_MS)             /**< Connection supervisory timeout (4 seconds to comply with R12 of Accessory Design Guidelines for Apple Devices). */
+#define CONN_SUP_TIMEOUT                MSEC_TO_UNITS(2000, UNIT_10_MS)             /**< Connection supervisory timeout (2 seconds minimum to comply with R12 of Accessory Design Guidelines for Apple Devices). */
 
-#define FIRST_CONN_PARAMS_UPDATE_DELAY  APP_TIMER_TICKS(20000)                      /**< Time from initiating event (connect or start of notification) to first time sd_ble_gap_conn_param_update is called (5 seconds). */
-#define NEXT_CONN_PARAMS_UPDATE_DELAY   APP_TIMER_TICKS(5000)                       /**< Time between each call to sd_ble_gap_conn_param_update after the first call (30 seconds). */
+#define FIRST_CONN_PARAMS_UPDATE_DELAY  APP_TIMER_TICKS(5000)                       /**< Time from initiating event (connect or start of notification) to first time sd_ble_gap_conn_param_update is called (5 seconds). */
+#define NEXT_CONN_PARAMS_UPDATE_DELAY   APP_TIMER_TICKS(5000)                       /**< Time between each call to sd_ble_gap_conn_param_update after the first call (5 seconds). */
 #define MAX_CONN_PARAMS_UPDATE_COUNT    3                                           /**< Number of attempts before giving up the connection parameter negotiation. */
 
 #define DEAD_BEEF                       0xDEADBEEF                                  /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
@@ -193,7 +196,7 @@ typedef struct
 
 BLE_BLUETRACK_DEF(m_bluetrack);                                                                   /**< Bluetrack Service instance. */
 NRF_BLE_GATT_DEF(m_gatt);                                                                         /**< GATT module instance. */
-NRF_BLE_QWR_DEF(m_qwr);                                                                           /**< Context for the Queued Write module.*/
+NRF_BLE_QWRS_DEF(m_qwr, NRF_SDH_BLE_PERIPHERAL_LINK_COUNT);                                       /**< Context for the Queued Write modules.*/
 APP_TIMER_DEF(output_timer);                                                                      /**< App Timer instance for relay output timing */
 APP_TIMER_DEF(feedback_timer);                                                                    /**< App Timer instance for feedback ADC measurement timing */
 
@@ -202,7 +205,6 @@ const nrf_drv_timer_t                   TIMER_BLE_LED =            NRF_DRV_TIMER
 static nrf_drv_pwm_t                    m_pwm0 =                   NRF_DRV_PWM_INSTANCE(0);
 static nrf_drv_pwm_t                    m_pwm1 =                   NRF_DRV_PWM_INSTANCE(1);
 
-static uint16_t                         m_conn_handle = BLE_CONN_HANDLE_INVALID;                  /**< Handle of the current connection. */
 static uint8_t                          m_adv_handle = BLE_GAP_ADV_SET_HANDLE_NOT_SET;            /**< Advertising handle used to identify an advertising set. */
 static uint8_t                          m_enc_advdata[BLE_GAP_ADV_SET_DATA_SIZE_MAX];             /**< Buffer for storing an encoded advertising set. */
 static uint8_t                          m_enc_scan_response_data[BLE_GAP_ADV_SET_DATA_SIZE_MAX];  /**< Buffer for storing an encoded scan data. */
@@ -264,6 +266,47 @@ static uint16_t                         speed_command_address[SPEED_COMMAND_ARRA
 static nrf_pwm_values_wave_form_t       main_pwm_sequence[DCC_COMMAND_MAX_N_BITS];                /**< Array for main PWM sequence. */
 static nrf_pwm_values_wave_form_t       prog_pwm_sequence[DCC_COMMAND_MAX_N_BITS];                /**< Array for programming PWM sequence. */
 
+
+/**@brief Function for initializing Radio Notification Software Interrupts.
+ */
+ret_code_t radio_notification_init(uint32_t irq_priority, uint8_t notification_type, uint8_t notification_distance)
+{
+    ret_code_t err_code;
+
+    err_code = sd_nvic_ClearPendingIRQ(SWI1_IRQn);
+    if (err_code != NRF_SUCCESS)
+    {
+        return err_code;
+    }
+
+    err_code = sd_nvic_SetPriority(SWI1_IRQn, irq_priority);
+    if (err_code != NRF_SUCCESS)
+    {
+        return err_code;
+    }
+
+    err_code = sd_nvic_EnableIRQ(SWI1_IRQn);
+    if (err_code != NRF_SUCCESS)
+    {
+        return err_code;
+    }
+
+    // Configure the event
+    return sd_radio_notification_cfg_set(notification_type, notification_distance);
+}
+
+
+/**@brief Software interrupt 1 IRQ Handler, handles radio notification interrupts.
+ */
+void SWI1_IRQHandler(bool radio_evt)
+{
+    if (radio_evt)
+    {
+        nrf_drv_gpiote_out_toggle(RADIO_PIN_NO); //Toggle the status of the LED on each radio notification event
+    }
+}
+
+
 /**@brief Function for removing all periodic speed commands
  */
 static void remove_all_speed_commands (void)
@@ -298,11 +341,20 @@ static void disable_DCC (uint8_t error_code)
     // Indicate on LED
     nrf_drv_gpiote_out_set(ERROR_LED_PIN_NO);
     
-    // Notify the client
-    err_code = ble_bluetrack_error_update(m_conn_handle, &m_bluetrack, error_code);
-    if (err_code != BLE_ERROR_INVALID_CONN_HANDLE && err_code != NRF_ERROR_INVALID_STATE && err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
+    // Notify the clients
+    ble_conn_state_conn_handle_list_t conn_handles = ble_conn_state_periph_handles();
+
+    for (uint8_t i = 0; i < conn_handles.len; i++)
     {
-        APP_ERROR_CHECK(err_code);
+        err_code = ble_bluetrack_error_update(conn_handles.conn_handles[i], &m_bluetrack, error_code);
+
+        if (err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
+            err_code != NRF_ERROR_INVALID_STATE &&
+            err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
+        {
+            APP_ERROR_CHECK(err_code);
+            NRF_LOG_INFO("Sent error 0x%x on connection handle 0x%x.", error_code, conn_handles.conn_handles[i]);
+        }
     }
 }
 
@@ -627,11 +679,20 @@ static void programming_track_select_write_handler(ble_bluetrack_t * p_bluetrack
         nrf_drv_gpiote_out_set(PROG_LED_PIN_NO);
     }
 
-    // Notify the client
-    err_code = ble_bluetrack_programming_track_select_update(m_conn_handle, &m_bluetrack);
-    if (err_code != BLE_ERROR_INVALID_CONN_HANDLE && err_code != NRF_ERROR_INVALID_STATE && err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
+    // Notify the clients
+    ble_conn_state_conn_handle_list_t conn_handles = ble_conn_state_periph_handles();
+
+    for (uint8_t i = 0; i < conn_handles.len; i++)
     {
-        APP_ERROR_CHECK(err_code);
+        err_code = ble_bluetrack_programming_track_select_update(conn_handles.conn_handles[i], &m_bluetrack);
+
+        if (err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
+            err_code != NRF_ERROR_INVALID_STATE &&
+            err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
+        {
+            APP_ERROR_CHECK(err_code);
+            NRF_LOG_INFO("Sent programming track notification on connection handle 0x%x.", conn_handles.conn_handles[i]);
+        }
     }
 }
 
@@ -674,11 +735,20 @@ static void stop_write_handler(ble_bluetrack_t * p_bluetrack, uint8_t stop)
         }
     }
 
-    // Notify the client
-    err_code = ble_bluetrack_stop_update(m_conn_handle, &m_bluetrack);
-    if (err_code != BLE_ERROR_INVALID_CONN_HANDLE && err_code != NRF_ERROR_INVALID_STATE && err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
+    // Notify the clients
+    ble_conn_state_conn_handle_list_t conn_handles = ble_conn_state_periph_handles();
+
+    for (uint8_t i = 0; i < conn_handles.len; i++)
     {
-        APP_ERROR_CHECK(err_code);
+        err_code = ble_bluetrack_stop_update(conn_handles.conn_handles[i], &m_bluetrack);
+
+        if (err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
+            err_code != NRF_ERROR_INVALID_STATE &&
+            err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
+        {
+            APP_ERROR_CHECK(err_code);
+            NRF_LOG_INFO("Sent stop notification on connection handle 0x%x.", conn_handles.conn_handles[i]);
+        }
     }
 }
 
@@ -1493,15 +1563,22 @@ static void feedback_timer_timeout_handler(void *p_context)
             // Buffer is empty in service mode
             if (function == FUNCTION_WRITE_BYTE || function == FUNCTION_WRITE_BIT)
             {
-                // We are done now, transmit back result
-                err_code = ble_bluetrack_response_update(m_conn_handle, &m_bluetrack, acknowledge ? 0x01 : 0x00, service_command_value);
-                if (err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
-                    err_code != NRF_ERROR_INVALID_STATE && 
-                    err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
+                // We are done now, transmit back result to clients
+                ble_conn_state_conn_handle_list_t conn_handles = ble_conn_state_periph_handles();
+
+                for (uint8_t i = 0; i < conn_handles.len; i++)
                 {
-                    APP_ERROR_CHECK(err_code);
+                    err_code = ble_bluetrack_response_update(conn_handles.conn_handles[i], &m_bluetrack, acknowledge ? 0x01 : 0x00, service_command_value);
+
+                    if (err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
+                        err_code != NRF_ERROR_INVALID_STATE &&
+                        err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
+                    {
+                        APP_ERROR_CHECK(err_code);
+                        NRF_LOG_INFO("Write byte/write bit of value %d complete, acknowledge = %d sent on connection handle 0x%x.", service_command_value, acknowledge, conn_handles.conn_handles[i]);
+                    }
                 }
-                NRF_LOG_INFO("Write byte/write bit of value %d complete, acknowledge = %d", service_command_value, acknowledge);
+                
                 service_command_in_progress = false;
             }
             else if (function == FUNCTION_READ_BYTE)
@@ -1509,15 +1586,22 @@ static void feedback_timer_timeout_handler(void *p_context)
                 // Last condition is special case to avoid repeating the read byte values for an address mode read
                 if (acknowledge || (read_byte_counter >= READ_BYTE_COUNTER_MAX) || (mode == MODE_ADDRESS && read_byte_counter >= READ_BIT_COUNTER_MAX_ADDRESS))
                 {
-                    // We have either received a positive response, or we've exhausted all values, transmit back result
-                    err_code = ble_bluetrack_response_update(m_conn_handle, &m_bluetrack, acknowledge ? 0x01 : 0x00, read_byte_counter);
-                    if (err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
-                        err_code != NRF_ERROR_INVALID_STATE &&
-                        err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
+                    // We have either received a positive response, or we've exhausted all values, transmit back result to clients
+                    ble_conn_state_conn_handle_list_t conn_handles = ble_conn_state_periph_handles();
+
+                    for (uint8_t i = 0; i < conn_handles.len; i++)
                     {
-                        APP_ERROR_CHECK(err_code);
+                        err_code = ble_bluetrack_response_update(conn_handles.conn_handles[i], &m_bluetrack, acknowledge ? 0x01 : 0x00, read_byte_counter);
+
+                        if (err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
+                            err_code != NRF_ERROR_INVALID_STATE &&
+                            err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
+                        {
+                            APP_ERROR_CHECK(err_code);
+                            NRF_LOG_INFO("Read byte complete, acknowledge = %d, value = %d sent on connection handle 0x%x.", acknowledge, service_command_value, conn_handles.conn_handles[i]);
+                        }
                     }
-                    NRF_LOG_INFO("Read byte complete, acknowledge = %d, value = %d", acknowledge, read_byte_counter);
+
                     service_command_in_progress = false;
                 }
                 else
@@ -1534,15 +1618,23 @@ static void feedback_timer_timeout_handler(void *p_context)
                 read_bit_value = read_bit_value | ((acknowledge ? 1 : 0) << read_bit_counter);
                 if (read_bit_counter >= READ_BIT_COUNTER_MAX)
                 {
-                    // We have finished asking for the value of all bit positions, transmit back result
-                    err_code = ble_bluetrack_response_update(m_conn_handle, &m_bluetrack, 0x01, read_bit_value);
-                    if (err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
-                        err_code != NRF_ERROR_INVALID_STATE &&
-                        err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
+
+                    // We have finished asking for the value of all bit positions, transmit back result to clients
+                    ble_conn_state_conn_handle_list_t conn_handles = ble_conn_state_periph_handles();
+
+                    for (uint8_t i = 0; i < conn_handles.len; i++)
                     {
-                        APP_ERROR_CHECK(err_code);
+                        err_code = ble_bluetrack_response_update(conn_handles.conn_handles[i], &m_bluetrack, 0x01, read_bit_value);
+
+                        if (err_code != BLE_ERROR_INVALID_CONN_HANDLE &&
+                            err_code != NRF_ERROR_INVALID_STATE &&
+                            err_code != BLE_ERROR_GATTS_SYS_ATTR_MISSING)
+                        {
+                            APP_ERROR_CHECK(err_code);
+                            NRF_LOG_INFO("Read bits complete, value = %d sent on connection handle 0x%x.", read_bit_value, conn_handles.conn_handles[i]);
+                        }
                     }
-                    NRF_LOG_INFO("Read bits complete, value = %d", read_bit_value);
+
                     service_command_in_progress = false;
                 }
                 else
@@ -1666,6 +1758,10 @@ static void gpiote_init(void)
     nrf_drv_gpiote_out_config_t config_out_simple_true =  GPIOTE_CONFIG_OUT_SIMPLE(true);
 
     err_code = nrf_drv_gpiote_init();
+    APP_ERROR_CHECK(err_code);
+
+    // Initialise radio activity output (start LOW) - under CPU control
+    err_code = nrf_drv_gpiote_out_init(RADIO_PIN_NO, &config_out_simple_false);
     APP_ERROR_CHECK(err_code);
 
     // Initialise brake output (start with brake on) - under CPU control
@@ -2055,8 +2151,11 @@ static void services_init(void)
     // Initialise Queued Write Module.
     qwr_init.error_handler = nrf_qwr_error_handler;
 
-    err_code = nrf_ble_qwr_init(&m_qwr, &qwr_init);
-    APP_ERROR_CHECK(err_code);
+    for (uint32_t i = 0; i < NRF_SDH_BLE_PERIPHERAL_LINK_COUNT; i++)
+    {
+        err_code = nrf_ble_qwr_init(&m_qwr[i], &qwr_init);
+        APP_ERROR_CHECK(err_code);
+    }
 
     // Initialise buttonless DFU service
     err_code = ble_dfu_buttonless_init(&dfus_init);
@@ -2079,28 +2178,6 @@ static void services_init(void)
     dis_init.dis_char_rd_sec = SEC_OPEN;
     err_code = ble_dis_init(&dis_init);
     APP_ERROR_CHECK(err_code);
-}
-
-
-/**@brief Function for handling the Connection Parameters Module.
- *
- * @details This function will be called for all events in the Connection Parameters Module which
- *          are passed to the application.
- *          @note All this function does is to disconnect. This could have been done by simply
- *                setting the disconnect_on_fail config parameter, but instead we use the event
- *                handler mechanism to demonstrate its use.
- *
- * @param[in]   p_evt   Event received from the Connection Parameters Module.
- */
-static void on_conn_params_evt(ble_conn_params_evt_t * p_evt)
-{
-    uint32_t err_code;
-
-    if(p_evt->evt_type == BLE_CONN_PARAMS_EVT_FAILED)
-    {
-        err_code = sd_ble_gap_disconnect(m_conn_handle, BLE_HCI_CONN_INTERVAL_UNACCEPTABLE);
-        APP_ERROR_CHECK(err_code);
-    }
 }
 
 
@@ -2128,8 +2205,7 @@ static void conn_params_init(void)
     cp_init.next_conn_params_update_delay  = NEXT_CONN_PARAMS_UPDATE_DELAY;
     cp_init.max_conn_params_update_count   = MAX_CONN_PARAMS_UPDATE_COUNT;
     cp_init.start_on_notify_cccd_handle    = BLE_GATT_HANDLE_INVALID;
-    cp_init.disconnect_on_fail             = false;
-    cp_init.evt_handler                    = on_conn_params_evt;
+    cp_init.disconnect_on_fail             = true;
     cp_init.error_handler                  = conn_params_error_handler;
 
     err_code = ble_conn_params_init(&cp_init);
@@ -2161,12 +2237,11 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
     ble_gatts_value_t                value;
     uint8_t                          m_programming_track_select_value = 0x00;
     uint8_t                          m_stop_value = 0x01;
+    uint32_t                         periph_link_cnt;
 
     switch (p_ble_evt->header.evt_id)
     {
         case BLE_GAP_EVT_CONNECTED:
-            NRF_LOG_INFO("Connected");
-
             // Disable timer control of BLE LED
             err_code = nrf_drv_ppi_channel_disable(ble_led_timer_to_ble_led);
             APP_ERROR_CHECK(err_code);
@@ -2174,48 +2249,73 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
             // Turn on BLE LED
             nrf_drv_gpiote_out_task_force(BLE_LED_PIN_NO, true);
 
-            m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
-            err_code = nrf_ble_qwr_conn_handle_assign(&m_qwr, m_conn_handle);
-            APP_ERROR_CHECK(err_code);
+            periph_link_cnt = ble_conn_state_peripheral_conn_count(); // Number of peripheral links.
+
+            NRF_LOG_INFO("Connection with link 0x%x established, max_conn_interval = 0x%x, min_conn_interval = 0x%x.", p_ble_evt->evt.gap_evt.conn_handle, p_ble_evt->evt.gap_evt.params.connected.conn_params.max_conn_interval, p_ble_evt->evt.gap_evt.params.connected.conn_params.min_conn_interval);
+
+            // Assign connection handle to available instance of QWR module.
+            for (uint32_t i = 0; i < NRF_SDH_BLE_PERIPHERAL_LINK_COUNT; i++)
+            {
+                if (m_qwr[i].conn_handle == BLE_CONN_HANDLE_INVALID)
+                {
+                    err_code = nrf_ble_qwr_conn_handle_assign(&m_qwr[i], p_ble_evt->evt.gap_evt.conn_handle);
+                    APP_ERROR_CHECK(err_code);
+                    break;
+                }
+            }
+
+            if (periph_link_cnt < NRF_SDH_BLE_PERIPHERAL_LINK_COUNT)
+            {
+                // Continue advertising. More connections can be established because the maximum link count has not been reached.
+                advertising_start();
+            }
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:
-            NRF_LOG_INFO("Disconnected");
-      
-            // Enable timer control of BLE LED
-            err_code = nrf_drv_ppi_channel_enable(ble_led_timer_to_ble_led);
-            APP_ERROR_CHECK(err_code);
+            periph_link_cnt = ble_conn_state_peripheral_conn_count(); // Number of peripheral links.
+
+            NRF_LOG_INFO("Connection 0x%x has been disconnected. Reason: 0x%x", p_ble_evt->evt.gap_evt.conn_handle, p_ble_evt->evt.gap_evt.params.disconnected.reason);
+
+            if (periph_link_cnt == 0)
+            {
+                // Nothing is connected
+                // Enable timer control of BLE LED (note advertising will already be active)
+                err_code = nrf_drv_ppi_channel_enable(ble_led_timer_to_ble_led);
+                APP_ERROR_CHECK(err_code);
+
+                // Remove all pending periodic speed commands
+                remove_all_speed_commands();
             
-            m_conn_handle = BLE_CONN_HANDLE_INVALID;
+                // Reset programming track selection and characteristic
+                programming_track_mode = MAIN;
+                nrf_drv_gpiote_out_clear(PROG_LED_PIN_NO);
+                value.len = PROGRAMMING_TRACK_SELECT_CHAR_SIZE;
+                value.offset = 0;
+                value.p_value = &m_programming_track_select_value;
+                err_code = sd_ble_gatts_value_set(BLE_CONN_HANDLE_INVALID, m_bluetrack.programming_track_select_char_handles.value_handle, &value);
+                APP_ERROR_CHECK(err_code);
 
-            // Remove all pending periodic speed commands
-            remove_all_speed_commands();
-            
-            // Reset programming track selection and characteristic
-            programming_track_mode = MAIN;
-            nrf_drv_gpiote_out_clear(PROG_LED_PIN_NO);
-            value.len = PROGRAMMING_TRACK_SELECT_CHAR_SIZE;
-            value.offset = 0;
-            value.p_value = &m_programming_track_select_value;
-            err_code = sd_ble_gatts_value_set(m_conn_handle, m_bluetrack.programming_track_select_char_handles.value_handle, &value);
-            APP_ERROR_CHECK(err_code);
+                // Reset stop selection and characteristic
+                nrf_drv_gpiote_out_clear(BRAKE_N_PIN_NO);
+                nrf_drv_gpiote_out_set(STOP_LED_PIN_NO);
+                value.len = STOP_CHAR_SIZE;
+                value.offset = 0;
+                value.p_value = &m_stop_value;
+                err_code = sd_ble_gatts_value_set(BLE_CONN_HANDLE_INVALID, m_bluetrack.stop_char_handles.value_handle, &value);
+                APP_ERROR_CHECK(err_code);
+            }
 
-            // Reset stop selection and characteristic
-            nrf_drv_gpiote_out_clear(BRAKE_N_PIN_NO);
-            nrf_drv_gpiote_out_set(STOP_LED_PIN_NO);
-            value.len = STOP_CHAR_SIZE;
-            value.offset = 0;
-            value.p_value = &m_stop_value;
-            err_code = sd_ble_gatts_value_set(m_conn_handle, m_bluetrack.stop_char_handles.value_handle, &value);
-            APP_ERROR_CHECK(err_code);
+            if (periph_link_cnt == (NRF_SDH_BLE_PERIPHERAL_LINK_COUNT - 1))
+            {
+                // Advertising is not running when all connections are taken, and must therefore be started (note the connection LED will be lit).
+                advertising_start();
+            }
 
-            // Restart advertising
-            advertising_start();
             break;
 
         case BLE_GAP_EVT_SEC_PARAMS_REQUEST:
             // Pairing not supported
-            err_code = sd_ble_gap_sec_params_reply(m_conn_handle,
+            err_code = sd_ble_gap_sec_params_reply(p_ble_evt->evt.gap_evt.conn_handle,
                                                    BLE_GAP_SEC_STATUS_PAIRING_NOT_SUPP,
                                                    NULL,
                                                    NULL);
@@ -2235,7 +2335,7 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
 
         case BLE_GATTS_EVT_SYS_ATTR_MISSING:
             // No system attributes have been stored.
-            err_code = sd_ble_gatts_sys_attr_set(m_conn_handle, NULL, 0, 0);
+            err_code = sd_ble_gatts_sys_attr_set(p_ble_evt->evt.gap_evt.conn_handle, NULL, 0, 0);
             APP_ERROR_CHECK(err_code);
             break;
 
@@ -2262,11 +2362,15 @@ static void ble_evt_handler(ble_evt_t const * p_ble_evt, void * p_context)
             // Empirically, Service Changed CCCD has handle 0xD, and is always Indicated (value is 0x2)
             // Note data is little endian
             if((p_evt_write->handle == 0xD) && (p_evt_write->len == 2) && (data[0] == 0x2)) {
-                NRF_LOG_INFO("Service Changed ready to indicate, indicating now");
-                err_code = gscm_service_changed_ind_send(m_conn_handle);
+                NRF_LOG_INFO("Service Changed ready to indicate on link 0x%x, indicating now", p_ble_evt->evt.gap_evt.conn_handle);
+                err_code = gscm_service_changed_ind_send(p_ble_evt->evt.gap_evt.conn_handle);
                 APP_ERROR_CHECK(err_code);
             }
             break;
+
+        case BLE_GAP_EVT_CONN_PARAM_UPDATE:
+            // Display new connection parameters
+            NRF_LOG_INFO("Connection with link 0x%x changed parameters to max_conn_interval = 0x%x, min_conn_interval = 0x%x.", p_ble_evt->evt.gap_evt.conn_handle, p_ble_evt->evt.gap_evt.params.connected.conn_params.max_conn_interval, p_ble_evt->evt.gap_evt.params.connected.conn_params.min_conn_interval);
 
         default:
             // No implementation needed.
@@ -2429,12 +2533,16 @@ static void pwm_init_and_start(void)
  */
 int main(void)
 {
+    ret_code_t err_code;
+
     // Initialize
     log_init();
     gpiote_init();
     timers_init();
     power_management_init();
     ble_stack_init();
+    err_code = radio_notification_init(3, NRF_RADIO_NOTIFICATION_TYPE_INT_ON_BOTH, NRF_RADIO_NOTIFICATION_DISTANCE_800US);
+    APP_ERROR_CHECK(err_code);
     scheduler_init();
     gap_params_init();
     gatt_init();
