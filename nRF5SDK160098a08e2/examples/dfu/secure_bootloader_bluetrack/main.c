@@ -277,8 +277,6 @@ int main(void)
     // Data is FICR DEVICEID
     memcpy(data, (uint8_t*)&(NRF_FICR->DEVICEID[0]), FICR_DEVICEID_LEN);
 
-    //nrf_crypto_internal_swap_endian_in_place(data, FICR_DEVICEID_LEN);
-
     NRF_LOG_INFO("Calculating FICR DEVICEID hash (len: %d)", FICR_DEVICEID_LEN);
     ret_val = nrf_crypto_hash_calculate(&hash_context,
                                          &g_nrf_crypto_hash_sha256_info,
@@ -290,8 +288,6 @@ int main(void)
 
     // Signature starts in UICR[1] and is big-endian for nrf_crypto use
     memcpy(signature, dummy_signature, NRF_CRYPTO_ECDSA_SECP256R1_SIGNATURE_SIZE);//&(NRF_UICR->CUSTOMER[1]), NRF_CRYPTO_ECDSA_SECP256R1_SIGNATURE_SIZE);
-
-    //nrf_crypto_internal_double_swap_endian_in_place(signature, NRF_CRYPTO_ECDSA_SECP256R1_SIGNATURE_SIZE / 2);
 
     // Calculate the signature.
     NRF_LOG_INFO("Verify hardware signature");
