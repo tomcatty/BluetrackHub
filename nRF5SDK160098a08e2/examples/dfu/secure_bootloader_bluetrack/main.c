@@ -61,6 +61,8 @@
 #include "nrf_bootloader_info.h"
 #include "nrf_delay.h"
 #include "nrf_gpio.h"
+#include "nrf_crypto.h"
+#include "nrf_crypto_shared.h"
 
 #define MAIN_DCC_PIN_NO                 2
 #define BRAKE_N_PIN_NO                  26
@@ -86,6 +88,10 @@
 #define PROG_LED_PIN_NO                 31
 
 #define N_OUTPUTS                       15
+
+#define FICR_DEVICEID_LEN               8
+
+__ALIGN(4) extern const uint8_t pk[64];
 
 static uint8_t                          output_pin[N_OUTPUTS] = {RELAY_1_PIN_NO,
                                                                  RELAY_2_PIN_NO,
@@ -224,6 +230,21 @@ static void dfu_observer(nrf_dfu_evt_type_t evt_type)
 int main(void)
 {
     uint32_t ret_val;
+    uint8_t  pk_copy[sizeof(pk)];
+    uint8_t  *p_signature;
+    uint8_t  data[FICR_DEVICEID_LEN];
+    nrf_crypto_ecc_public_key_t             public_key;
+    size_t hash_len = NRF_CRYPTO_HASH_SIZE_SHA256;
+    nrf_crypto_hash_context_t         hash_context   = {0};
+    nrf_crypto_ecdsa_verify_context_t verify_context = {0};
+    nrf_crypto_hash_sha256_digest_t              hash;
+    nrf_crypto_ecdsa_secp256r1_signature_t       signature;
+
+    uint8_t dummy_signature[NRF_CRYPTO_ECDSA_SECP256R1_SIGNATURE_SIZE] =
+    {
+        0xe1, 0x8e, 0xbd, 0xab, 0x9f, 0x9e, 0xe8, 0x25, 0x8b, 0xc8, 0xbe, 0xa4, 0x27, 0xdf, 0x68, 0x9e, 0x52, 0x5c, 0xd9, 0x49, 0x7a, 0xf7, 0x88, 0x73, 0x91, 0x8f, 0x69, 0x51, 0x04, 0x62, 0xea, 0xb8,
+        0xd1, 0x7b, 0xbc, 0x31, 0x9a, 0x2d, 0x96, 0x88, 0x1a, 0xbb, 0xcb, 0xa4, 0xf7, 0x87, 0xea, 0x57, 0x81, 0xc4, 0x97, 0xcc, 0x1f, 0x9b, 0xe6, 0x10, 0x77, 0x00, 0x67, 0x74, 0x88, 0x36, 0xfa, 0x77
+    };
 
     // Must happen before flash protection is applied, since it edits a protected page.
     nrf_bootloader_mbr_addrs_populate();
@@ -238,6 +259,65 @@ int main(void)
     NRF_LOG_DEFAULT_BACKENDS_INIT();
 
     NRF_LOG_INFO("Inside main");
+
+    NRF_LOG_INFO("Checking hardware signature")
+ 
+    ret_val = nrf_crypto_init();
+    APP_ERROR_CHECK(ret_val);
+
+    // Convert public key to big-endian format for use in nrf_crypto.
+    nrf_crypto_internal_double_swap_endian(pk_copy, pk, sizeof(pk) / 2);
+
+    ret_val = nrf_crypto_ecc_public_key_from_raw(&g_nrf_crypto_ecc_secp256r1_curve_info,
+                                                  &public_key,
+                                                  pk_copy,
+                                                  sizeof(pk));
+    APP_ERROR_CHECK(ret_val);
+
+    // Data is FICR DEVICEID
+    memcpy(data, (uint8_t*)&(NRF_FICR->DEVICEID[0]), FICR_DEVICEID_LEN);
+
+    //nrf_crypto_internal_swap_endian_in_place(data, FICR_DEVICEID_LEN);
+
+    NRF_LOG_INFO("Calculating FICR DEVICEID hash (len: %d)", FICR_DEVICEID_LEN);
+    ret_val = nrf_crypto_hash_calculate(&hash_context,
+                                         &g_nrf_crypto_hash_sha256_info,
+                                         data,
+                                         FICR_DEVICEID_LEN,
+                                         hash,
+                                         &hash_len);
+    APP_ERROR_CHECK(ret_val);
+
+    // Signature starts in UICR[1] and is big-endian for nrf_crypto use
+    memcpy(signature, dummy_signature, NRF_CRYPTO_ECDSA_SECP256R1_SIGNATURE_SIZE);//&(NRF_UICR->CUSTOMER[1]), NRF_CRYPTO_ECDSA_SECP256R1_SIGNATURE_SIZE);
+
+    //nrf_crypto_internal_double_swap_endian_in_place(signature, NRF_CRYPTO_ECDSA_SECP256R1_SIGNATURE_SIZE / 2);
+
+    // Calculate the signature.
+    NRF_LOG_INFO("Verify hardware signature");
+    ret_val = nrf_crypto_ecdsa_verify(&verify_context,
+                                       &public_key,
+                                       hash,
+                                       hash_len,
+                                       signature,
+                                       NRF_CRYPTO_ECDSA_SECP256R1_SIGNATURE_SIZE);
+    if (ret_val != NRF_SUCCESS)
+    {
+        NRF_LOG_ERROR("Signature failed (err_code: 0x%x)", ret_val);
+        NRF_LOG_DEBUG("Signature:");
+        NRF_LOG_HEXDUMP_DEBUG(signature, sizeof(signature));
+        NRF_LOG_DEBUG("Hash:");
+        NRF_LOG_HEXDUMP_DEBUG(hash, hash_len);
+        NRF_LOG_DEBUG("Data:");
+        NRF_LOG_HEXDUMP_DEBUG(data, FICR_DEVICEID_LEN);
+        NRF_LOG_DEBUG("Public Key:");
+        NRF_LOG_HEXDUMP_DEBUG(pk_copy, sizeof(pk_copy));
+        NRF_LOG_FLUSH();
+
+        APP_ERROR_CHECK(ret_val);
+    }
+
+    NRF_LOG_INFO("Hardware signature verified");
 
     ret_val = nrf_bootloader_init(dfu_observer);
     APP_ERROR_CHECK(ret_val);
