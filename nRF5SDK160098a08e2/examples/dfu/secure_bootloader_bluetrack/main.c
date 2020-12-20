@@ -240,12 +240,6 @@ int main(void)
     nrf_crypto_hash_sha256_digest_t              hash;
     nrf_crypto_ecdsa_secp256r1_signature_t       signature;
 
-    uint8_t dummy_signature[NRF_CRYPTO_ECDSA_SECP256R1_SIGNATURE_SIZE] =
-    {
-        0xe1, 0x8e, 0xbd, 0xab, 0x9f, 0x9e, 0xe8, 0x25, 0x8b, 0xc8, 0xbe, 0xa4, 0x27, 0xdf, 0x68, 0x9e, 0x52, 0x5c, 0xd9, 0x49, 0x7a, 0xf7, 0x88, 0x73, 0x91, 0x8f, 0x69, 0x51, 0x04, 0x62, 0xea, 0xb8,
-        0xd1, 0x7b, 0xbc, 0x31, 0x9a, 0x2d, 0x96, 0x88, 0x1a, 0xbb, 0xcb, 0xa4, 0xf7, 0x87, 0xea, 0x57, 0x81, 0xc4, 0x97, 0xcc, 0x1f, 0x9b, 0xe6, 0x10, 0x77, 0x00, 0x67, 0x74, 0x88, 0x36, 0xfa, 0x77
-    };
-
     // Must happen before flash protection is applied, since it edits a protected page.
     nrf_bootloader_mbr_addrs_populate();
 
@@ -286,8 +280,8 @@ int main(void)
                                          &hash_len);
     APP_ERROR_CHECK(ret_val);
 
-    // Signature starts in UICR[1] and is big-endian for nrf_crypto use
-    memcpy(signature, dummy_signature, NRF_CRYPTO_ECDSA_SECP256R1_SIGNATURE_SIZE);//&(NRF_UICR->CUSTOMER[1]), NRF_CRYPTO_ECDSA_SECP256R1_SIGNATURE_SIZE);
+    // Signature starts in CUSTOMER[4] as CUSTOMER[0] is written by the .hex file, and is big-endian for nrf_crypto use
+    memcpy(signature, (uint8_t*)&(NRF_UICR->CUSTOMER[4]), NRF_CRYPTO_ECDSA_SECP256R1_SIGNATURE_SIZE);
 
     // Calculate the signature.
     NRF_LOG_INFO("Verify hardware signature");
