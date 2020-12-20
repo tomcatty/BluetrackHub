@@ -304,20 +304,24 @@ int main(void)
         NRF_LOG_HEXDUMP_DEBUG(pk_copy, sizeof(pk_copy));
         NRF_LOG_FLUSH();
 
-        APP_ERROR_CHECK(ret_val);
+        // Remain stuck here with error LED on
+        gpio_init();
+        nrf_gpio_pin_set(ERROR_LED_PIN_NO);
     }
+    else
+    {
+        NRF_LOG_INFO("Hardware signature verified");
 
-    NRF_LOG_INFO("Hardware signature verified");
+        ret_val = nrf_bootloader_init(dfu_observer);
+        APP_ERROR_CHECK(ret_val);
 
-    ret_val = nrf_bootloader_init(dfu_observer);
-    APP_ERROR_CHECK(ret_val);
+        NRF_LOG_FLUSH();
 
-    NRF_LOG_FLUSH();
+        NRF_LOG_ERROR("After main, should never be reached.");
+        NRF_LOG_FLUSH();
 
-    NRF_LOG_ERROR("After main, should never be reached.");
-    NRF_LOG_FLUSH();
-
-    APP_ERROR_CHECK_BOOL(false);
+        APP_ERROR_CHECK_BOOL(false);
+    }
 }
 
 /**
