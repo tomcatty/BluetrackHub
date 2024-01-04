@@ -3,7 +3,7 @@ This project is a Bluetooth controlled Digital Command Control (DCC) Center for 
 
 See below for a demonstration with the companion BlueTrack Controller app (link pending):
 
-![`BlueTrackDemonstrationMovie`](resources/Demonstration.MOV)
+![`BlueTrackDemonstrationMovie`](resources/Demonstration.mp4)
 
 It runs on the BlueTrack Hub hardware available from Seeed Fusion Gallery (link pending), which incorporates the nRF52833 System On Chip (SoC). 
 
