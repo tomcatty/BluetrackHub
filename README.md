@@ -5,7 +5,10 @@ See below for a demonstration with the companion BlueTrack Controller app (link 
 
 ![`BlueTrackDemonstrationMovie`](resources/Demonstration.MOV)
 
-It runs on the BlueTrack Hub hardware available from Seeed Fusion Gallery (link pending), which incorporates the nRF52833 System On Chip (SoC). This is for hobbyist use only, no claims of safety or functionality are made. 
+It runs on the BlueTrack Hub hardware available from Seeed Fusion Gallery (link pending), which incorporates the nRF52833 System On Chip (SoC). 
+
+> [!CAUTION]
+> This is for hobbyist use only, no claims of safety or functionality are made. 
 
 # Development Environment
 See the nRF52 DK user guide at https://infocenter.nordicsemi.com/topic/ug_nrf52832_dk/UG/dk/intro.html and SES getting started guide at https://infocenter.nordicsemi.com/topic/ug_gsg_ses/UG/gsg/intro.html. 
@@ -20,19 +23,21 @@ The following versions were used to build this project:
 # Building the Project
 ## Generate complete .hex file for programming
 
-Compile the nRF5SDK160098a08e2/examples/ble_peripheral/ble_app_bluetrack/pca10040/s132/ses and nRF5SDK160098a08e2/examples/dfu/secure_bootloader_bluetrack/pca10040_s132_ble_debug/ses project in SES, using the Release configuration.
+Compile the `nRF5SDK160098a08e2/examples/ble_peripheral/ble_app_bluetrack/pca10040/s132/ses` and `nRF5SDK160098a08e2/examples/dfu/secure_bootloader_bluetrack/pca10040_s132_ble_debug/ses` project in SES, using the Release configuration.
 
 From root of the project, execute the following:
 
-1. nrfutil nrf5sdk-tools settings generate --family NRF52 --application nRF5SDK160098a08e2/examples/ble_peripheral/ble_app_bluetrack/pca10040/s132/ses/Output/Release/Exe/ble_app_bluetrack_pca10040_s132.hex --application-version 1 --bootloader-version 2 --bl-settings-version 2 --app-boot-validation NO_VALIDATION --sd-boot-validation NO_VALIDATION --softdevice nRF5SDK160098a08e2/components/softdevice/s132/hex/s132_nrf52_7.0.1_softdevice.hex settings.hex
-1. mergehex --merge nRF5SDK160098a08e2/examples/ble_peripheral/ble_app_bluetrack/pca10040/s132/ses/Output/Release/Exe/ble_app_bluetrack_pca10040_s132.hex nRF5SDK160098a08e2/examples/dfu/secure_bootloader_bluetrack/pca10040_s132_ble_debug/ses/Output/Release/Exe/secure_bootloader_bluetrack_ble_s132_pca10040_debug.hex nRF5SDK160098a08e2/components/softdevice/s132/hex/s132_nrf52_7.0.1_softdevice.hex settings.hex --output bluetrack.hex
+1. `nrfutil nrf5sdk-tools settings generate --family NRF52 --application nRF5SDK160098a08e2/examples/ble_peripheral/ble_app_bluetrack/pca10040/s132/ses/Output/Release/Exe/ble_app_bluetrack_pca10040_s132.hex --application-version 1 --bootloader-version 2 --bl-settings-version 2 --app-boot-validation NO_VALIDATION --sd-boot-validation NO_VALIDATION --softdevice nRF5SDK160098a08e2/components/softdevice/s132/hex/s132_nrf52_7.0.1_softdevice.hex settings.hex`
+1. `mergehex --merge nRF5SDK160098a08e2/examples/ble_peripheral/ble_app_bluetrack/pca10040/s132/ses/Output/Release/Exe/ble_app_bluetrack_pca10040_s132.hex nRF5SDK160098a08e2/examples/dfu/secure_bootloader_bluetrack/pca10040_s132_ble_debug/ses/Output/Release/Exe/secure_bootloader_bluetrack_ble_s132_pca10040_debug.hex nRF5SDK160098a08e2/components/softdevice/s132/hex/s132_nrf52_7.0.1_softdevice.hex settings.hex --output bluetrack.hex`
 
 ## Generate .zip file for DFU
 
 From root of the project, execute the following:
-nrfutil nrf5sdk-tools pkg generate --application  nRF5SDK160098a08e2/examples/ble_peripheral/ble_app_bluetrack/pca10040/s132/ses/Output/Release/Exe/ble_app_bluetrack_pca10040_s132.hex --application-version 1 --bootloader nRF5SDK160098a08e2/examples/dfu/secure_bootloader_bluetrack/pca10040_s132_ble_debug/ses/Output/Release/Exe/secure_bootloader_bluetrack_ble_s132_pca10040_debug.hex --bootloader-version 2 --hw-version 2 --sd-req 0xCB --sd-id 0xCB --softdevice nRF5SDK160098a08e2/components/softdevice/s132/hex/s132_nrf52_7.0.1_softdevice.hex --key-file priv.pem hw_2_sd_0xCB_bl_2_app_1.zip
 
-Note: I acknowledge it is bad practice to place a private key in a public repository, this is included to allow others to continue developing the iOS application. 
+`nrfutil nrf5sdk-tools pkg generate --application  nRF5SDK160098a08e2/examples/ble_peripheral/ble_app_bluetrack/pca10040/s132/ses/Output/Release/Exe/ble_app_bluetrack_pca10040_s132.hex --application-version 1 --bootloader nRF5SDK160098a08e2/examples/dfu/secure_bootloader_bluetrack/pca10040_s132_ble_debug/ses/Output/Release/Exe/secure_bootloader_bluetrack_ble_s132_pca10040_debug.hex --bootloader-version 2 --hw-version 2 --sd-req 0xCB --sd-id 0xCB --softdevice nRF5SDK160098a08e2/components/softdevice/s132/hex/s132_nrf52_7.0.1_softdevice.hex --key-file priv.pem hw_2_sd_0xCB_bl_2_app_1.zip`
+
+> [!NOTE]
+> I acknowledge it is bad practice to place a private key in a public repository, this is included to allow others to continue developing the iOS application. 
 
 ## Hardware 
 
@@ -42,17 +47,20 @@ Note: I acknowledge it is bad practice to place a private key in a public reposi
 1. Connect the nRF52 DK to your PC ane power it up by ensuring the Power switch (SW6) is set to ON.
 1. Connect the IDE cable from Debug out (P19) on the nRF52 to DEBUG_IN (P600) on the BlueTrack Hub (see picture below).
 
+> [!IMPORTANT]
+> Make sure the IDE cable pinout is correct when connecting to DEBUG_IN (P600) on the BlueTrack Hub, see picture below.
+
 ![`BlueTrackProgrammingConnection`](resources/ProgrammingSetup.jpg)
 
-From the root of the project, execute the following (note --recover is specified as the BMD-350-A-R comes with protection enabled):
+From the root of the project, execute the following (note `--recover` is specified as the BMD-350-A-R comes with protection enabled):
 
-nrfjprog --program bluetrack.hex --recover --verify --reset
+`nrfjprog --program bluetrack.hex --recover --verify --reset`
 
 # Design Description
 This project is based on nRF SDK 16.0.0 and uses the S132 Softdevice 7.0.1, and was originally branched from the ble_blinky sample project. All changes from SDK 16.0.0 can be identified by comparing to the initial commit.
-Below are some specific notes on on aspects of the design. 
-## Hardware Description
+Below are some specific notes on on aspects of the design.
 
+## Hardware Description
 ### Assembly
 See CircuitMaker project (link pending) for full design, including schematic. It can be assembled by Seeed (link pending) using the design files and BOM in the Seeed Fusion Gallery. Additional assembly that may be required depending on what can be arranged with Seeed:
 * Attachment of the motor drivers (LMD18200T/NOPB) to the heatsinks (6396BG) using attachment kit 4880G, this needs to be done prior to through hole soldering.
@@ -74,74 +82,89 @@ Either a 15V or 13.5V wall wart power supply can be used. LMD18200T has Rdson of
 
 The internally generated supply voltage is 3V to allow for programming by the nRF52 DK and is generated by an LDO. Shown below is the typical and maximum current. The typical current excludes the yellow and red LEDs, as well as the green LED and relay current. 
 
-Component                   Current (mA)
-Resistor Ladder             1.154767796
-Orange LED                  15
-Red LED (x2)                30
-Yellow LED                  15
-Blue LED                    4
-Green LED + Relay           35
-nRF52                       7.1
-Brake                       1.726505321
-DCC (50% duty cycle, x2)    1.726505321
-    
-Maximum                     110.7077784
-    
-Typical                     30.70777844
+| Component                   | Current (mA) |
+| --------------------------- | ------------ |
+| Resistor Ladder             | 1.154767796  |
+| Orange LED                  | 15           |
+| Red LED (x2)                | 30           |
+| Yellow LED                  | 15           |
+| Blue LED                    | 4            |
+| Green LED + Relay           | 35           |
+| nRF52                       | 7.1          |
+| Brake                       | 1.726505321  |
+| DCC (50% duty cycle, x2)    | 1.726505321  |
+| Maximum                     | 110.7077784  |
+| Typical                     | 30.70777844  |
 
 ## ble_app\_bluetrack
 ### Flash Memory
 Space is reserved for the bootloader and bootloader data to ensure the compiled .hex does not overwrite the bootloader.
+
 ### Main Loop
 The main loop consists of the inbuilt power management function (which also allows log output to be flushed out) as well as kicking the scheduler.
+
 ### Debug Output
 NRF_FPRINTF_FLAG_AUTOMATIC_CR_ON_LF_ENABLED has to be set to 0 to allow NRF_LOG to work with Segger RTT https://devzone.nordicsemi.com/f/nordic-q-a/46685/no-log-output-to-debug-terminal-in-ses-or-rtt-viewer
+
 ### GIO Configuration
 The application uses the gpiote hardware driver to manage the interfaces. 
 Every output is under control of the CPU except the advertising LED which is under control of gpiote tasks, the main track DCC output, and the programming track DCC output (under PWM control). 
 The THERMAL_N input generates an interrupt which disables the DCC and notifies an error. This must be checked after interrupt setup in case it was low before setup.
+
 ### Timer Configuration
 One hardware timer is used for the advertising LED. The application timer uses the scheduler.
 The advertising LED timer has a dummy handler which is never enabled.
+
 ### PPI Configuration
 The PPI is used to link the timers to the gpiote tasks. 
 On BLE connection, the PPI channel for the advertising LED is disabled and the LED is forced on. On BLE connection, the PPI channel is re-enabled.
+
 ### PWM Configuration
 Two PWM modules are used for the main and programming outputs. The PWM modules draw data from RAM using EasyDMA, which frees up the CPU. At the end of the sequence, the modules output the last PWM setting, so make sure this is a DCC “one”. On initialisation and first start a single “one” is populated, this is just so the handlers fire and take over the DCC control. 
+
 ### ADC Configuration
 ADC is set to 1/3 gain with 0.6V reference and 14 bit resolution.
 10us sampling time is fine as the source resistance is 1.74kohm.
-           Current Output Sensitivity (uA/A)    Pin Input Sensitivity (V/A)    ADC Input Sensitivity (count/A)    ADC Input Resolution (mA/count)
-Minimum    300                                  0.522                          4751.36                            0.210466056
-Nominal    377                                  0.65598                        5970.875733                        0.16747962
-Maximum    450                                  0.783                          7127.04                            0.140310704
+
+|            | Current Output Sensitivity (uA/A)    | Pin Input Sensitivity (V/A)    | ADC Input Sensitivity (count/A)    | ADC Input Resolution (mA/count) | 
+| ---------- | ------------------------------------ | ------------------------------ | ---------------------------------- | ------------------------------- |
+| Minimum    | 300                                  | 0.522                          | 4751.36                            | 0.210466056 | 
+| Nominal    | 377                                  | 0.65598                        | 5970.875733                        | 0.16747962 | 
+| Maximum    | 450                                  | 0.783                          | 7127.04                            | 0.140310704 | 
+
 The ADC is sampled (by sample_convert) every 500us so we can take at least 10 samples during a 5ms period when collecting feedback (S-9.2.3).
 Note buffer_convert was not found to work reliably, root cause unknown (maybe the memory was not statically allocated?).
 The 2.2V Zener protection MMSZ4680T1G draws 50uA between 2.09V and 2.31V, and 4uA at 1V, this reduces the measured ADC voltage by a fixed offset, but this is insignificant compared to the sensitivity variation.
+
 ### Safety Design
 The THERMAL_N signal generates an interrupt which disables the DCC and notifies an error.
 The SAADC is set up to sample both MAIN_I_SENSE_PIN and PROG_I_SENSE_PIN with 14 bit resolution. The feedback timer runs approximately every 0.5ms to sample the ADC, and if the sample is above the limit it will disable the DCC and notify an error. 
 For 1.6A output current limit (https://www.digikey.com.au/product-detail/en/triad-magnetics/WSX150-1600/237-2145-ND/6165640)
-Rsense (ohms)                                              1740
-Gain                                                       0.333333333
-Reference (V)                                              0.6
-Resolution (bits)                                          14
-Maximum Value (counts)                                     16383
-Current Limit (A)                                          1.6
-Limit (based on minimum sensitivity) (counts)              7602
-Limit (based on minimum sensitivity) (V)                   0.835180664
-Lowest Current Limit (based on maximum sensitivity) (A)    1.066641972
+
+| Rsense (ohms)                                              | 1740 | 
+| Gain                                                       | 0.333333333 | 
+| Reference (V)                                              | 0.6 | 
+| Resolution (bits)                                          | 14 | 
+| Maximum Value (counts)                                     | 16383 | 
+| Current Limit (A)                                          | 1.6 | 
+| Limit (based on minimum sensitivity) (counts)              | 7602 | 
+| Limit (based on minimum sensitivity) (V)                   | 0.835180664 | 
+| Lowest Current Limit (based on maximum sensitivity) (A)    | 1.066641972 | 
 
 When a safety check trips, the hub enters error mode, which means that the DCC outputs are permanently disabled until the hub goes through a power on reset (i.e. switched on and off), and the error characteristic is notified. The red error LED is solidly lit in this case.
 
 ### Stop
 The stop characteristic when turned on sets the stop LED as well as turns on the brake. When turned off the stop LED is turned off, and the brake is disengaged (only if an error has not occurred). In either case, the characteristic is notified. This notification is done within the handler. When BLE disconnects, the stop characteristic is set, and the stop LED and brake set.
+
 ### Relay Actuation
 An application timer fires every 1s, and at each firing it turns off a relay that was turned on the previous firing (if one was turned on), and then turns on a single relay that has been marked to actuate by the address characteristic. This means only a single relay can be actuated at a time to protect the power supply, as well as making sure a single relay is actuated for 1s to make sure the circuit it controls actuates. The relays are designed to connect a 12V AC 0.5A supply.
+
 ### DCC Design
 When the hub initialises, we do not send 20 reset packets and 10 idle packets, as suggested by S-9.2.4.
+
 #### Programming Track Selection
 The hub starts off in programming_track_state = MAIN. The write handler signals the state is to be changed by updating programming_state_mode to either MAIN or PROGRAMMING; a state change is delayed until there are no commands to draw from the buffers. Despite this delay, the PROG_LED_PIN is updated (on for PROGRAMMING, off for MAIN) and the characteristic notified immediately. A check for 250mA current sustained for 100ms upon entering programming mode is not performed, which is optional (should) in S-9.2.3. When BLE disconnects, the hub sets programming_track_mode = MAIN.
+
 #### DCC Command Write Handler
 The DCC command write handler processes incoming DCC commands only when neither service_command_pending or service_command_in_progress are raised, this is to ensure the dcc_command_buffer clears to eventually permit a service command to be executed, and once the service command is started this prevents dcc_command_buffer overflowing if new commands are sent when a service command is in progress. The write handler schedules the enqueueing of the DCC command. This scheduled task does the following:
 * Repeats the command 10 times, and obtains a copy of the command sent out on the rails
@@ -157,19 +180,20 @@ Note that all periodic speed commands are cleared on BLE disconnect.
 If there is no room in the queue, the command is dropped silently.
 #### Service Command Write Handler
 Service commands are only executed when the command buffer is empty. The write handler simply stores the command in global variables and raises service_command_pending when a valid command is received, provided neither service_command_pending or service_command_in_progress are already raised.
+
 #### Feedback
 If a DCC command packet requires feedback (it is assumed every service command will request feedback, enforced by the service command logic). Once feedback is in progress, no other packet can request feedback until the dcc_command_buffer is empty. When dcc_command_buffer is empty, the feedback window ends. To start a feedback window, the appropriate flags are set. 
 
 Every feedback timer handler, the ADC is always sampled. If feedback is in progress and the feedback window has not ended, the sample is evaluated to determine if the value read is sufficiently above the baseline as to constitute a positive acknowledgement. This is defined as minimum 60mA in S-9.2.3. This baseline is collected in the first ADC sample of the window.
 
-Rsense (ohms)                                                              1740
-Gain                                                                       0.333333333
-Reference (V)                                                              0.6
-Resolution (bits)                                                          14
-Maximum Value (counts)                                                     16383
-Minimum Additional Load (specified in S-9.2.3) (mA)                        60
-Minimum Delta (based on minimum sensitivity) (counts)                      285
-Minimum Detectable Additional Load (based on  maximum sensitivity) (mA)    39.98855065
+| Rsense (ohms)                                                              | 1740 | 
+| Gain                                                                       | 0.333333333 | 
+| Reference (V)                                                              | 0.6 | 
+| Resolution (bits)                                                          | 14 | 
+| Maximum Value (counts)                                                     | 16383 | 
+| Minimum Additional Load (specified in S-9.2.3) (mA)                        | 60 | 
+| Minimum Delta (based on minimum sensitivity) (counts)                      | 285 | 
+| Minimum Detectable Additional Load (based on  maximum sensitivity) (mA)    | 39.98855065 |
 
 If feedback is in progress and the feedback window is ended (i.e. dcc_command_buffer is empty), the service command is advanced. If it was a WRITE service command, acknowledge is simply notified back. If it is a READ service command, for byte read if there was no acknowledge the READ command is resent with the next value, otherwise the acknowledged value is sent back with acknowledge=1. If all READ values have been sent, acknowledge is notified with 0. For bit read, the next bit is read, otherwise if all bits have been read acknowledge is notified with value 1 and the bits are accumulated and sent. After this logic, feedback_in_progress is set to false. When acknowledge is notified, service_command_in_progress is set to false.
 
@@ -201,6 +225,7 @@ This handler is triggered whenever the PWM module finishes transmitting the last
   * If the active packet is from dcc_command_buffer: 
     * update the consumer index to make sure the next command in dcc_command_buffer gets priority over speed_command_array_temp and idle_packet
     * if the dcc_command buffer is now empty and there is a service command in progress, indicate that the feedback window should be ended (note the assumption that service commands always include a feedback command at some point, and the only time feedback is requested is for a service command)
+
 ### Bluetooth LE Design
 #### Configuration
 The app_timer module must be initialised for the SDK to work with the softdevice. 
@@ -222,11 +247,13 @@ The Hub simply connects to the central client, and does not bond with it, simply
 The BLE_LED is solid when connected, and flashes when disconnected and advertising.
 
 Errors encountered notifying characteristics that are related to the central client not enabling notifications are ignored.
+
 #### Services
 There are three services, one custom BlueTrack service, one standard Device Information Service, and one custom unbonded buttonless DFU service (this is termed “experimental" in https://github.com/NordicSemiconductor/IOS-Pods-DFU-Library).
 * The BlueTrack service is initialised with the write handlers provided by the application.
 * The DIS is initialised with the model name and manufacturer name, and the security is set to open so they can be freely read. 
 * All code that writes to the advertising name is IFDEF’ed out in the buttonless DFU service as it is too complicated to compile and adds no value. Any attempt to do this will return an unsupported response to the central. The power management handler is not used in the application as asynchronous resets are not a problem. The DFU handler also doesn’t do anything.
+
 #### Advertising
 The hub sends both advertising data and scan response data. 
 
@@ -275,6 +302,7 @@ GIO configuration:
 * Stop LED is lit when no DFU in progress, and flashes when in progress
 * Error LED lights up when something goes wrong
 * All other GIO is configured as outputs and turned off (except the brake, which is turned on)
+
 ### Hardware Signature
 This is disabled for open source release. 
 
