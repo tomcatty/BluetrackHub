@@ -37,7 +37,7 @@ From root of the project, execute the following:
 `nrfutil nrf5sdk-tools pkg generate --application  nRF5SDK160098a08e2/examples/ble_peripheral/ble_app_bluetrack/pca10040/s132/ses/Output/Release/Exe/ble_app_bluetrack_pca10040_s132.hex --application-version 1 --bootloader nRF5SDK160098a08e2/examples/dfu/secure_bootloader_bluetrack/pca10040_s132_ble_debug/ses/Output/Release/Exe/secure_bootloader_bluetrack_ble_s132_pca10040_debug.hex --bootloader-version 2 --hw-version 2 --sd-req 0xCB --sd-id 0xCB --softdevice nRF5SDK160098a08e2/components/softdevice/s132/hex/s132_nrf52_7.0.1_softdevice.hex --key-file priv.pem hw_2_sd_0xCB_bl_2_app_1.zip`
 
 > [!NOTE]
-> I acknowledge it is bad practice to place a private key in a public repository, this is included to allow others to continue developing the iOS application. 
+> I acknowledge it is bad practice to place a private key in a public repository, this is included to allow others to continue developing the iOS application, and is required because this project was originally developed to be proprietary. 
 
 ## Hardware 
 
@@ -308,7 +308,7 @@ GIO configuration:
 ### Hardware Signature
 This is disabled for open source release. 
 
-Previously, on bootloader boot, the 64 byte (NRF_CRYPTO_ECDSA_SECP256R1_SIGNATURE_SIZE) hardware signature stored in UICR.CUSTOMER[4] – UICR.CUSTOMER[18] generated from the FICR Device ID is checked against the public key. If this check fails, the device is bricked, and will sit there with the error LED written. This feature exists to make sure no-one can build the hardware without the ability to generate a valid signature with the private key.
+Previously, on bootloader boot, the 64 byte (NRF_CRYPTO_ECDSA_SECP256R1_SIGNATURE_SIZE) hardware signature stored in UICR.CUSTOMER[4] – UICR.CUSTOMER[18] generated from the FICR Device ID is checked against the public key. If this check fails, the device is bricked, and will sit there with the error LED written. This feature exists to make sure no-one can build the hardware and use the .hex file without the ability to generate a valid signature with the private key, and is therefore a defence against hardware cloning.
 SHA256 hashing of the FICR Device ID is used, and the ECDSA used is SECP256R1 (NIST 256-bit).
 
 
