@@ -142,6 +142,7 @@ The SAADC is set up to sample both MAIN_I_SENSE_PIN and PROG_I_SENSE_PIN with 14
 For 1.6A output current limit (https://www.digikey.com.au/product-detail/en/triad-magnetics/WSX150-1600/237-2145-ND/6165640)
 
 | Rsense (ohms)                                              | 1740 | 
+| ---------------------------------------------------------- | ----- |
 | Gain                                                       | 0.333333333 | 
 | Reference (V)                                              | 0.6 | 
 | Resolution (bits)                                          | 14 | 
@@ -187,6 +188,7 @@ If a DCC command packet requires feedback (it is assumed every service command w
 Every feedback timer handler, the ADC is always sampled. If feedback is in progress and the feedback window has not ended, the sample is evaluated to determine if the value read is sufficiently above the baseline as to constitute a positive acknowledgement. This is defined as minimum 60mA in S-9.2.3. This baseline is collected in the first ADC sample of the window.
 
 | Rsense (ohms)                                                              | 1740 | 
+| -------------------------------------------------------------------------- | ---- |
 | Gain                                                                       | 0.333333333 | 
 | Reference (V)                                                              | 0.6 | 
 | Resolution (bits)                                                          | 14 | 
