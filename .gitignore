@@ -1,6 +1,13 @@
-**/Output/
+**/Output/Release/Exe/**
+**/Output/Debug/Exe/**
+**/Output/Release/Obj/**
+**/Output/Debug/Obj/**
+!**/Output/Release/Exe/ble_app_bluetrack_pca10040_s132.hex
+!**/Output/Release/Exe/secure_bootloader_bluetrack_ble_s132_pca10040_debug.hex
 
 *.jlink
 
 *.emSession
+
+*.DS_Store
 

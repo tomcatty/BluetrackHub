@@ -3,6 +3,10 @@
   Name="secure_bootloader_bluetrack_ble_s132_pca10040_debug"
   target="8"
   version="2">
+  <configuration
+    Name="Release"
+    c_preprocessor_definitions="NDEBUG"
+    gcc_optimization_level="Optimize For Size" />
   <project Name="secure_bootloader_bluetrack_ble_s132_pca10040_debug">
     <configuration
       Name="Common"
@@ -36,15 +40,77 @@
       macros="CMSIS_CONFIG_TOOL=../../../../../external_tools/cmsisconfig/CMSIS_Configuration_Wizard.jar"
       project_directory=""
       project_type="Executable" />
-    <folder Name="Segger Startup Files">
-      <file file_name="$(StudioDir)/source/thumb_crt0.s" />
+    <folder Name="Application">
+      <file file_name="../../main.c" />
+      <file file_name="../../public_key.c" />
+      <file file_name="../config/sdk_config.h" />
     </folder>
-    <folder Name="nRF_Log">
-      <file file_name="../../../../../components/libraries/log/src/nrf_log_backend_rtt.c" />
-      <file file_name="../../../../../components/libraries/log/src/nrf_log_backend_serial.c" />
-      <file file_name="../../../../../components/libraries/log/src/nrf_log_default_backends.c" />
-      <file file_name="../../../../../components/libraries/log/src/nrf_log_frontend.c" />
-      <file file_name="../../../../../components/libraries/log/src/nrf_log_str_formatter.c" />
+    <folder Name="Board Definition">
+      <file file_name="../../../../../components/boards/boards.c" />
+    </folder>
+    <folder Name="nano-pb">
+      <file file_name="../../../../../external/nano-pb/pb_common.c" />
+      <file file_name="../../../../../external/nano-pb/pb_decode.c" />
+    </folder>
+    <folder Name="None">
+      <file file_name="../../../../../modules/nrfx/mdk/ses_startup_nrf52.s" />
+      <file file_name="../../../../../modules/nrfx/mdk/ses_startup_nrf_common.s" />
+      <file file_name="../../../../../modules/nrfx/mdk/system_nrf52.c" />
+    </folder>
+    <folder Name="nRF_BLE">
+      <file file_name="../../../../../components/ble/common/ble_srv_common.c" />
+    </folder>
+    <folder Name="nRF_Bootloader">
+      <file file_name="../../../../../components/libraries/bootloader/nrf_bootloader.c" />
+      <file file_name="../../../../../components/libraries/bootloader/nrf_bootloader_app_start.c" />
+      <file file_name="../../../../../components/libraries/bootloader/nrf_bootloader_app_start_final.c" />
+      <file file_name="../../../../../components/libraries/bootloader/nrf_bootloader_dfu_timers.c" />
+      <file file_name="../../../../../components/libraries/bootloader/nrf_bootloader_fw_activation.c" />
+      <file file_name="../../../../../components/libraries/bootloader/nrf_bootloader_info.c" />
+      <file file_name="../../../../../components/libraries/bootloader/nrf_bootloader_wdt.c" />
+    </folder>
+    <folder Name="nRF_Crypto">
+      <file file_name="../../../../../components/libraries/crypto/nrf_crypto_ecc.c" />
+      <file file_name="../../../../../components/libraries/crypto/nrf_crypto_ecdsa.c" />
+      <file file_name="../../../../../components/libraries/crypto/nrf_crypto_hash.c" />
+      <file file_name="../../../../../components/libraries/crypto/nrf_crypto_init.c" />
+      <file file_name="../../../../../components/libraries/crypto/nrf_crypto_shared.c" />
+    </folder>
+    <folder Name="nRF_Crypto backend nRF sw">
+      <file file_name="../../../../../components/libraries/crypto/backend/nrf_sw/nrf_sw_backend_hash.c" />
+    </folder>
+    <folder Name="nRF_Crypto backend Oberon">
+      <file file_name="../../../../../components/libraries/crypto/backend/oberon/oberon_backend_chacha_poly_aead.c" />
+      <file file_name="../../../../../components/libraries/crypto/backend/oberon/oberon_backend_ecc.c" />
+      <file file_name="../../../../../components/libraries/crypto/backend/oberon/oberon_backend_ecdh.c" />
+      <file file_name="../../../../../components/libraries/crypto/backend/oberon/oberon_backend_ecdsa.c" />
+      <file file_name="../../../../../components/libraries/crypto/backend/oberon/oberon_backend_eddsa.c" />
+      <file file_name="../../../../../components/libraries/crypto/backend/oberon/oberon_backend_hash.c" />
+      <file file_name="../../../../../components/libraries/crypto/backend/oberon/oberon_backend_hmac.c" />
+    </folder>
+    <folder Name="nRF_Crypto backend uECC">
+      <file file_name="../../../../../components/libraries/crypto/backend/micro_ecc/micro_ecc_backend_ecc.c" />
+      <file file_name="../../../../../components/libraries/crypto/backend/micro_ecc/micro_ecc_backend_ecdh.c" />
+      <file file_name="../../../../../components/libraries/crypto/backend/micro_ecc/micro_ecc_backend_ecdsa.c" />
+    </folder>
+    <folder Name="nRF_DFU">
+      <file file_name="../../../../../components/libraries/bootloader/dfu/dfu-cc.pb.c" />
+      <file file_name="../../../../../components/libraries/bootloader/dfu/nrf_dfu.c" />
+      <file file_name="../../../../../components/libraries/bootloader/ble_dfu/nrf_dfu_ble.c" />
+      <file file_name="../../../../../components/libraries/bootloader/dfu/nrf_dfu_flash.c" />
+      <file file_name="../../../../../components/libraries/bootloader/dfu/nrf_dfu_handling_error.c" />
+      <file file_name="../../../../../components/libraries/bootloader/dfu/nrf_dfu_mbr.c" />
+      <file file_name="../../../../../components/libraries/bootloader/dfu/nrf_dfu_req_handler.c" />
+      <file file_name="../../../../../components/libraries/bootloader/dfu/nrf_dfu_settings.c" />
+      <file file_name="../../../../../components/libraries/bootloader/dfu/nrf_dfu_settings_svci.c" />
+      <file file_name="../../../../../components/libraries/bootloader/dfu/nrf_dfu_transport.c" />
+      <file file_name="../../../../../components/libraries/bootloader/dfu/nrf_dfu_utils.c" />
+      <file file_name="../../../../../components/libraries/bootloader/dfu/nrf_dfu_validation.c" />
+      <file file_name="../../../../../components/libraries/bootloader/dfu/nrf_dfu_ver_validation.c" />
+    </folder>
+    <folder Name="nRF_Drivers">
+      <file file_name="../../../../../modules/nrfx/hal/nrf_nvmc.c" />
+      <file file_name="../../../../../modules/nrfx/soc/nrfx_atomic.c" />
     </folder>
     <folder Name="nRF_Libraries">
       <file file_name="../../../../../components/libraries/util/app_error_weak.c" />
@@ -68,102 +134,35 @@
       <file file_name="../../../../../components/libraries/strerror/nrf_strerror.c" />
       <file file_name="../../../../../components/libraries/sha256/sha256.c" />
     </folder>
-    <folder Name="nRF_Drivers">
-      <file file_name="../../../../../modules/nrfx/hal/nrf_nvmc.c" />
-      <file file_name="../../../../../modules/nrfx/soc/nrfx_atomic.c" />
-    </folder>
-    <folder Name="nRF_Crypto backend uECC">
-      <file file_name="../../../../../components/libraries/crypto/backend/micro_ecc/micro_ecc_backend_ecc.c" />
-      <file file_name="../../../../../components/libraries/crypto/backend/micro_ecc/micro_ecc_backend_ecdh.c" />
-      <file file_name="../../../../../components/libraries/crypto/backend/micro_ecc/micro_ecc_backend_ecdsa.c" />
-    </folder>
-    <folder Name="nano-pb">
-      <file file_name="../../../../../external/nano-pb/pb_common.c" />
-      <file file_name="../../../../../external/nano-pb/pb_decode.c" />
-    </folder>
-    <folder Name="Board Definition">
-      <file file_name="../../../../../components/boards/boards.c" />
-    </folder>
-    <folder Name="nRF_SVC">
-      <file file_name="../../../../../components/libraries/bootloader/dfu/nrf_dfu_svci.c" />
-      <file file_name="../../../../../components/libraries/bootloader/dfu/nrf_dfu_svci_handler.c" />
-      <file file_name="../../../../../components/libraries/svc/nrf_svc_handler.c" />
-    </folder>
-    <folder Name="nRF_Oberon_Crypto">
-      <file file_name="../../../../../external/nrf_oberon/lib/cortex-m4/hard-float/liboberon_3.0.1.a" />
-    </folder>
-    <folder Name="nRF_Crypto">
-      <file file_name="../../../../../components/libraries/crypto/nrf_crypto_ecc.c" />
-      <file file_name="../../../../../components/libraries/crypto/nrf_crypto_ecdsa.c" />
-      <file file_name="../../../../../components/libraries/crypto/nrf_crypto_hash.c" />
-      <file file_name="../../../../../components/libraries/crypto/nrf_crypto_init.c" />
-      <file file_name="../../../../../components/libraries/crypto/nrf_crypto_shared.c" />
-    </folder>
-    <folder Name="Application">
-      <file file_name="../../main.c" />
-      <file file_name="../config/sdk_config.h" />
-      <file file_name="../../public_key.c" />
+    <folder Name="nRF_Log">
+      <file file_name="../../../../../components/libraries/log/src/nrf_log_backend_rtt.c" />
+      <file file_name="../../../../../components/libraries/log/src/nrf_log_backend_serial.c" />
+      <file file_name="../../../../../components/libraries/log/src/nrf_log_default_backends.c" />
+      <file file_name="../../../../../components/libraries/log/src/nrf_log_frontend.c" />
+      <file file_name="../../../../../components/libraries/log/src/nrf_log_str_formatter.c" />
     </folder>
     <folder Name="nRF_micro-ecc">
       <file file_name="../../../../../external/micro-ecc/nrf52hf_armgcc/armgcc/micro_ecc_lib_nrf52.a" />
     </folder>
+    <folder Name="nRF_Oberon_Crypto">
+      <file file_name="../../../../../external/nrf_oberon/lib/cortex-m4/hard-float/liboberon_3.0.1.a" />
+    </folder>
     <folder Name="nRF_Segger_RTT">
       <file file_name="../../../../../external/segger_rtt/SEGGER_RTT.c" />
-      <file file_name="../../../../../external/segger_rtt/SEGGER_RTT_Syscalls_SES.c" />
       <file file_name="../../../../../external/segger_rtt/SEGGER_RTT_printf.c" />
-    </folder>
-    <folder Name="nRF_Bootloader">
-      <file file_name="../../../../../components/libraries/bootloader/nrf_bootloader.c" />
-      <file file_name="../../../../../components/libraries/bootloader/nrf_bootloader_app_start.c" />
-      <file file_name="../../../../../components/libraries/bootloader/nrf_bootloader_app_start_final.c" />
-      <file file_name="../../../../../components/libraries/bootloader/nrf_bootloader_dfu_timers.c" />
-      <file file_name="../../../../../components/libraries/bootloader/nrf_bootloader_fw_activation.c" />
-      <file file_name="../../../../../components/libraries/bootloader/nrf_bootloader_info.c" />
-      <file file_name="../../../../../components/libraries/bootloader/nrf_bootloader_wdt.c" />
-    </folder>
-    <folder Name="None">
-      <file file_name="../../../../../modules/nrfx/mdk/ses_startup_nrf52.s" />
-      <file file_name="../../../../../modules/nrfx/mdk/ses_startup_nrf_common.s" />
-      <file file_name="../../../../../modules/nrfx/mdk/system_nrf52.c" />
-    </folder>
-    <folder Name="nRF_Crypto backend nRF sw">
-      <file file_name="../../../../../components/libraries/crypto/backend/nrf_sw/nrf_sw_backend_hash.c" />
-    </folder>
-    <folder Name="nRF_BLE">
-      <file file_name="../../../../../components/ble/common/ble_srv_common.c" />
-    </folder>
-    <folder Name="nRF_DFU">
-      <file file_name="../../../../../components/libraries/bootloader/dfu/dfu-cc.pb.c" />
-      <file file_name="../../../../../components/libraries/bootloader/dfu/nrf_dfu.c" />
-      <file file_name="../../../../../components/libraries/bootloader/ble_dfu/nrf_dfu_ble.c" />
-      <file file_name="../../../../../components/libraries/bootloader/dfu/nrf_dfu_flash.c" />
-      <file file_name="../../../../../components/libraries/bootloader/dfu/nrf_dfu_handling_error.c" />
-      <file file_name="../../../../../components/libraries/bootloader/dfu/nrf_dfu_mbr.c" />
-      <file file_name="../../../../../components/libraries/bootloader/dfu/nrf_dfu_req_handler.c" />
-      <file file_name="../../../../../components/libraries/bootloader/dfu/nrf_dfu_settings.c" />
-      <file file_name="../../../../../components/libraries/bootloader/dfu/nrf_dfu_settings_svci.c" />
-      <file file_name="../../../../../components/libraries/bootloader/dfu/nrf_dfu_transport.c" />
-      <file file_name="../../../../../components/libraries/bootloader/dfu/nrf_dfu_utils.c" />
-      <file file_name="../../../../../components/libraries/bootloader/dfu/nrf_dfu_validation.c" />
-      <file file_name="../../../../../components/libraries/bootloader/dfu/nrf_dfu_ver_validation.c" />
     </folder>
     <folder Name="nRF_SoftDevice">
       <file file_name="../../../../../components/softdevice/common/nrf_sdh.c" />
       <file file_name="../../../../../components/softdevice/common/nrf_sdh_ble.c" />
       <file file_name="../../../../../components/softdevice/common/nrf_sdh_soc.c" />
     </folder>
-    <folder Name="nRF_Crypto backend Oberon">
-      <file file_name="../../../../../components/libraries/crypto/backend/oberon/oberon_backend_chacha_poly_aead.c" />
-      <file file_name="../../../../../components/libraries/crypto/backend/oberon/oberon_backend_ecc.c" />
-      <file file_name="../../../../../components/libraries/crypto/backend/oberon/oberon_backend_ecdh.c" />
-      <file file_name="../../../../../components/libraries/crypto/backend/oberon/oberon_backend_ecdsa.c" />
-      <file file_name="../../../../../components/libraries/crypto/backend/oberon/oberon_backend_eddsa.c" />
-      <file file_name="../../../../../components/libraries/crypto/backend/oberon/oberon_backend_hash.c" />
-      <file file_name="../../../../../components/libraries/crypto/backend/oberon/oberon_backend_hmac.c" />
+    <folder Name="nRF_SVC">
+      <file file_name="../../../../../components/libraries/bootloader/dfu/nrf_dfu_svci.c" />
+      <file file_name="../../../../../components/libraries/bootloader/dfu/nrf_dfu_svci_handler.c" />
+      <file file_name="../../../../../components/libraries/svc/nrf_svc_handler.c" />
+    </folder>
+    <folder Name="Segger Startup Files">
+      <file file_name="$(StudioDir)/source/thumb_crt0.s" />
     </folder>
   </project>
-  <configuration
-    Name="Release"
-    c_preprocessor_definitions="NDEBUG"
-    gcc_optimization_level="Optimize For Size" />
 </solution>
