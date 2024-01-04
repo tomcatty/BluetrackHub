@@ -1,7 +1,7 @@
 # Introduction
 This project is a Bluetooth controlled Digital Command Control (DCC) Center for model trains of N and HO gauge. See https://www.nmra.org/index-nmra-standards-and-recommended-practices for the DCC standard. It also provides 15x relay outputs for control of switches/signals etc on a layout.
 
-See below for a demonstration with the companion BlueTrack Controller app (link pending):
+Click the image below for a demonstration with the companion BlueTrack Controller app:
 
 [![Video](https://img.youtube.com/vi/xS7GTewaBds/hqdefault.jpg)](https://www.youtube.com/watch?v=xS7GTewaBds)
 
