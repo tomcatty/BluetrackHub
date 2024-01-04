@@ -62,7 +62,7 @@ Below are some specific notes on on aspects of the design.
 
 ## Hardware Description
 ### Assembly
-See CircuitMaker project at https://workspace.circuitmaker.com/Projects/Details/tomcatty/BlueTrack-Hub for full design, including schematic. It can be assembled by Seeed (link pending) using the design files and BOM in the Seeed Fusion Gallery. Additional assembly that may be required depending on what can be arranged with Seeed:
+See CircuitMaker project at https://workspace.circuitmaker.com/Projects/Details/tomcatty/BlueTrack-Hub for full design, for convenience see [Schematics](resources/BlueTrack Hub Schematics.PDF). It can be assembled by Seeed (link pending) using the design files and bill of materials (BOM) in the Seeed Fusion Gallery. Additional assembly that may be required depending on what can be arranged with Seeed:
 * Attachment of the motor drivers (LMD18200T/NOPB) to the heatsinks (6396BG) using attachment kit 4880G, this needs to be done prior to through hole soldering.
 * Ensure all links prescribed by the schematic are installed (these are included in the BOM)
 * Optional assembly into a box (items listed in Notes in BOM in the Seeed Fusion Gallery)
