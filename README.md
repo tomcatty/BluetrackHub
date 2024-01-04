@@ -251,10 +251,33 @@ The BLE_LED is solid when connected, and flashes when disconnected and advertisi
 Errors encountered notifying characteristics that are related to the central client not enabling notifications are ignored.
 
 #### Services
-There are three services, one custom BlueTrack service, one standard Device Information Service, and one custom unbonded buttonless DFU service (this is termed “experimental" in https://github.com/NordicSemiconductor/IOS-Pods-DFU-Library).
+There are three primary services, one custom BlueTrack service, one standard Device Information Service, and one custom unbonded buttonless DFU service (this is termed “experimental" in https://github.com/NordicSemiconductor/IOS-Pods-DFU-Library).
 * The BlueTrack service is initialised with the write handlers provided by the application.
 * The DIS is initialised with the model name and manufacturer name, and the security is set to open so they can be freely read. 
 * All code that writes to the advertising name is IFDEF’ed out in the buttonless DFU service as it is too complicated to compile and adds no value. Any attempt to do this will return an unsupported response to the central. The power management handler is not used in the application as asynchronous resets are not a problem. The DFU handler also doesn’t do anything.
+
+The BlueTrack service uses the base UUID of 0x3051**1523**C768685DE626473B0866AE21 and consists of the following characteristics:
+
+| Characteristic | UUID | Size (bytes) | Read | Write | Notify | Notes |
+| -------------- | ---- | ------------ | ---- | ----- | ------ | ----- |
+| Relay Address | 0x1524 | 1 | Yes | Yes | No | Write the address of the relay to be actuated. | 
+| DCC Command | 0x1525 | 6 | Yes | Yes | No | Write the DCC command to be sent on the active output (either MAIN or PROGRAMMING), speed commands will be repeated. | 
+| Programming Track Select | 0x1526 | 1 | Yes | Yes | Yes | 0=MAIN selected as active output, 1=PROGRAMMING selected as active output. Will notify when transition complete. 0 on startup. |
+| Stop | 0x1527 | 1 | Yes | Yes | Yes | 0=DCC Output enabled, 1=DCC output disabled. Will notify when transition complete. 1 on startup. | 
+| Reponse | 0x1528 | 2 | Yes | No | Yes | Data received from a service command that reads data from a DCC decoder. Will notify when updated. | 
+| Service Command | 0x1529 | 5 | Yes | Yes | No | Write the service mode DCC command to be sent on the active output (either MAIN or PROGRAMMING). If this service mode DCC command reads data from a DCC decoder, the Response characteristic will be updated and notified. | 
+| Error | 0x1530 | 1 | Yes | No | Yes | If non-zero, and error has occurred. Will be notified when the value is set. See error response codes below. Errors can only be cleared by power cycling the BlueTrack Hub. | 
+
+Error response codes are shown below.
+
+| Code | Meaning | 
+| ---- | ------- |
+| 1 | Maximum number of trains (128) exceeded | 
+| 2 | One or both the DCC drivers have indicated overtemperature | 
+| 3 | The MAIN DCC driver is providing too much current (possible short) | 
+| 4 | The PROGRAMMING DCC driver is providing too much current (possible short) | 
+| 5 | Both the MAIN and PROGRAMMING DCC drivers are providing too much current (possible short) | 
+| 6 | The sum of the MAIN and PROGRAMMING DCC driver current exceeds the maximum that can be provided by the power supply | 
 
 #### Advertising
 The hub sends both advertising data and scan response data. 
