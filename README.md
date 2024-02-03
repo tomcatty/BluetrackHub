@@ -5,7 +5,7 @@ Click the image below for a demonstration with the companion BlueTrack Controlle
 
 [![Video](https://img.youtube.com/vi/xS7GTewaBds/hqdefault.jpg)](https://www.youtube.com/watch?v=xS7GTewaBds)
 
-It runs on the BlueTrack Hub hardware available from Seeed Fusion Gallery (link pending), which incorporates the nRF52833 System On Chip (SoC). 
+It runs on the BlueTrack Hub hardware available from [Seeed Fusion Gallery](https://github.com/tomcatty/BluetrackHub), which incorporates the nRF52833 System On Chip (SoC). 
 
 > [!CAUTION]
 > This is for hobbyist use only, no claims of safety or functionality are made. 
