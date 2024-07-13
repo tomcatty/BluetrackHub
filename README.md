@@ -1,5 +1,5 @@
 # Privacy
-The BlueTrack Controller App and BlueTrack Hub does not collect any personal data.
+The BlueTrack Controller App and BlueTrack Hub does not collect any personal data. No logins are required, and no personal information can be entered.
 
 # Introduction
 This project is a Bluetooth controlled Digital Command Control (DCC) Center for model trains of N and HO gauge. See https://www.nmra.org/index-nmra-standards-and-recommended-practices for the DCC standard. It also provides 15x relay outputs for control of switches/signals etc on a layout.
